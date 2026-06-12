@@ -89,14 +89,14 @@
         /* A área exata que o OBS captura */
         #obs-bounds {
             position: absolute;
+            box-sizing: border-box;
             width: var(--obs-width);
             height: var(--obs-height);
             left: var(--canvas-padding);
             top: var(--canvas-padding);
-            border: 5px solid #ff0055;
-            box-shadow: 0 0 50px rgba(255, 0, 85, 0.3) inset, 0 0 0 9999px rgba(0,0,0,0.4);
+            border: 2px dashed #ff0055;
+            box-shadow: 0 0 50px rgba(255, 0, 85, 0.3) inset, 0 0 0 9999px rgba(0,0,0,0.5);
             pointer-events: none;
-            box-sizing: border-box;
         }
         
         #obs-bounds::after {
@@ -113,18 +113,18 @@
             position: absolute;
             cursor: grab;
             user-select: none;
-            border: 3px solid transparent;
+            outline: 3px solid transparent;
             transform-origin: top left;
         }
 
         .draggable:hover {
-            border: 3px dashed #007bff;
+            outline: 3px dashed #007bff;
             z-index: 100;
         }
 
         /* Destaque para elemento selecionado no clique para atalhos de teclado */
         .draggable.selected {
-            border: 3px solid #00ff88;
+            outline: 3px solid #00ff88;
             z-index: 101;
         }
 
@@ -164,7 +164,7 @@
 
         .hidden-media {
             opacity: 0.3 !important;
-            border-color: #d39e00 !important;
+            outline-color: #d39e00 !important;
         }
 
         .resize-handle {
@@ -330,16 +330,93 @@
         }
 
         window.addEventListener('keydown', (e) => {
+            // Previne atalhos se estiver digitando numa caixa de texto
+            if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+
             if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementId) {
-                // Previne deletar acidentalmente se estiver digitando numa caixa de texto
-                if (document.activeElement.tagName === 'INPUT') return;
-                
                 const container = document.getElementById(`admin-${selectedElementId}`);
                 if (container) {
                     container.remove();
                     socket.emit('media:delete', { id: selectedElementId });
                     delete mediaState[selectedElementId];
                     selectedElementId = null;
+                }
+            }
+
+            // Atalho F para Fullscreen
+            if ((e.key === 'f' || e.key === 'F') && selectedElementId) {
+                const id = selectedElementId;
+                const media = mediaState[id];
+                const container = document.getElementById(`admin-${id}`);
+                const contentEl = container ? container.querySelector('.media-content') : null;
+
+                if (media && container && contentEl) {
+                    if (!media.isFullScreen) {
+                        // Salva o estado atual
+                        media.savedState = {
+                            x: media.x,
+                            y: media.y,
+                            scaleX: media.scaleX !== undefined ? media.scaleX : (media.scale || 1),
+                            scaleY: media.scaleY !== undefined ? media.scaleY : (media.scale || 1)
+                        };
+
+                        // Calcula a escala necessária
+                        const baseWidth = contentEl.offsetWidth || 1;
+                        const baseHeight = contentEl.offsetHeight || 1;
+                        
+                        const newScaleX = 1920 / baseWidth;
+                        const newScaleY = 1080 / baseHeight;
+
+                        // Aplica estado Full Screen
+                        media.x = 0;
+                        media.y = 0;
+                        media.scaleX = newScaleX;
+                        media.scaleY = newScaleY;
+                        media.isFullScreen = true;
+                    } else {
+                        // Restaura estado anterior
+                        if (media.savedState) {
+                            media.x = media.savedState.x;
+                            media.y = media.savedState.y;
+                            media.scaleX = media.savedState.scaleX;
+                            media.scaleY = media.savedState.scaleY;
+                        }
+                        media.isFullScreen = false;
+                    }
+
+                    // Atualiza localmente
+                    container.style.left = (media.x + canvasPadding) + 'px';
+                    container.style.top = (media.y + canvasPadding) + 'px';
+                    container.style.transform = `scale(${media.scaleX}, ${media.scaleY})`;
+                    
+                    const controls = container.querySelector('.draggable-controls');
+                    if (controls) controls.style.transform = `scale(${1 / media.scaleX}, ${1 / media.scaleY})`;
+                    const resizeHandle = container.querySelector('.resize-handle');
+                    if (resizeHandle) resizeHandle.style.transform = `scale(${1 / media.scaleX}, ${1 / media.scaleY})`;
+
+                    // Emite pro servidor/OBS
+                    socket.emit('media:drag_sync', { id: id, x: media.x, y: media.y });
+                    socket.emit('media:scale_sync', { id: id, scaleX: media.scaleX, scaleY: media.scaleY });
+                }
+            }
+
+            // Atalho H para Ocultar/Mostrar
+            if ((e.key === 'h' || e.key === 'H') && selectedElementId) {
+                const id = selectedElementId;
+                const media = mediaState[id];
+                const container = document.getElementById(`admin-${id}`);
+                const btnVisibility = container ? container.querySelector('.btn-hide') : null;
+
+                if (media && container) {
+                    media.visible = !media.visible;
+                    if (media.visible) {
+                        container.classList.remove('hidden-media');
+                        if (btnVisibility) btnVisibility.innerText = '👁️ Ocultar';
+                    } else {
+                        container.classList.add('hidden-media');
+                        if (btnVisibility) btnVisibility.innerText = '🙈 Mostrar';
+                    }
+                    socket.emit('media:toggle_visibility', { id: id, visible: media.visible });
                 }
             }
         });
@@ -390,8 +467,94 @@
         });
 
         // ============================================
-        // UPLOAD POR DRAG & DROP DO PC
+        // UPLOAD POR DRAG & DROP DO PC E DA INTERNET + COLAR (CTRL+V)
         // ============================================
+        function handleFileUpload(file, canvasX, canvasY) {
+            if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const tooltip = document.querySelector('.tooltip');
+                const oldHtml = tooltip.innerHTML;
+                tooltip.innerHTML = "<b>Fazendo upload do arquivo...</b>";
+
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(res => res.json())
+                .then(data => {
+                    tooltip.innerHTML = oldHtml; // Restaura
+                    if (data.url) {
+                        createMediaFromUrl(data.url, canvasX, canvasY);
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro no upload:', err);
+                    tooltip.innerHTML = oldHtml;
+                    alert('Erro ao enviar o arquivo.');
+                });
+            } else {
+                alert('Formato de arquivo não suportado. Envie Imagens ou Vídeos.');
+            }
+        }
+
+        function createMediaFromUrl(url, canvasX, canvasY) {
+            const newId = 'media_' + Math.random().toString(36).substring(2, 9);
+            const mediaData = {
+                id: newId,
+                url: url,
+                x: Math.round(canvasX - canvasPadding),
+                y: Math.round(canvasY - canvasPadding),
+                visible: true,
+                scaleX: 1,
+                scaleY: 1,
+                zIndex: 10
+            };
+            createDraggableElement(mediaData, canvasX, canvasY);
+            socket.emit('media:create', mediaData);
+        }
+
+        function extractUrlFromData(dataTransfer) {
+            // Priority 1: HTML parsing to extract actual image tag
+            // Crucial for Firefox + Google Images to avoid capturing redirect URLs (/imgres)
+            const html = dataTransfer.getData('text/html');
+            if (html) {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                const img = tempDiv.querySelector('img');
+                if (img) {
+                    let src = img.getAttribute('src');
+                    // Falha caso src seja apenas um caminho relativo (raro no drag and drop de abas, mas previne quebra)
+                    if (src && (src.startsWith('http') || src.startsWith('data:')) && !src.includes('/imgres?')) {
+                        return src;
+                    }
+                }
+            }
+
+            // Priority 2: Standard text URLs
+            let url = dataTransfer.getData('URL') || dataTransfer.getData('text/uri-list');
+            if (url) {
+                url = url.split('\n').find(line => line.trim() && !line.startsWith('#'));
+                if (url && !url.includes('/imgres?')) return url.trim();
+            }
+
+            // Priority 3: Firefox specific
+            let mozUrl = dataTransfer.getData('text/x-moz-url');
+            if (mozUrl) {
+                let mUrl = mozUrl.split('\n')[0].trim();
+                if (mUrl && !mUrl.includes('/imgres?')) return mUrl;
+            }
+
+            // Priority 4: Plain text fallback
+            let plain = dataTransfer.getData('text/plain');
+            if (plain && (plain.startsWith('http') || plain.startsWith('data:')) && !plain.includes('/imgres?')) {
+                return plain.trim();
+            }
+
+            return null;
+        }
+
         workspace.addEventListener('dragover', (e) => {
             e.preventDefault();
             workspace.style.border = '2px dashed #00ff88'; // Feedback visual
@@ -406,55 +569,35 @@
             e.preventDefault();
             workspace.style.border = 'none';
 
+            const rect = virtualCanvas.getBoundingClientRect();
+            const mouseX_inCanvas = (e.clientX - rect.left) / currentScale;
+            const mouseY_inCanvas = (e.clientY - rect.top) / currentScale;
+
             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                const file = e.dataTransfer.files[0];
-                
-                // Aceita apenas imagens ou videos
-                if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
-                    const formData = new FormData();
-                    formData.append('file', file);
+                handleFileUpload(e.dataTransfer.files[0], mouseX_inCanvas, mouseY_inCanvas);
+            } else {
+                let url = extractUrlFromData(e.dataTransfer);
+                if (url && (url.startsWith('http') || url.startsWith('data:'))) {
+                    createMediaFromUrl(url, mouseX_inCanvas, mouseY_inCanvas);
+                }
+            }
+        });
 
-                    // Mostra um feedback que está enviando (opcional)
-                    const tooltip = document.querySelector('.tooltip');
-                    const oldHtml = tooltip.innerHTML;
-                    tooltip.innerHTML = "<b>Fazendo upload do arquivo...</b>";
+        window.addEventListener('paste', (e) => {
+            // Ignora atalho se estiver digitando num input
+            if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
 
-                    fetch('/upload', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .then(res => res.json())
-                    .then(data => {
-                        tooltip.innerHTML = oldHtml; // Restaura
-                        if (data.url) {
-                            const newId = 'media_' + Math.random().toString(36).substring(2, 9);
-                            
-                            // Calcula onde a imagem foi solta no canvas virtual
-                            const rect = virtualCanvas.getBoundingClientRect();
-                            const mouseX_inCanvas = (e.clientX - rect.left) / currentScale;
-                            const mouseY_inCanvas = (e.clientY - rect.top) / currentScale;
+            // Calcula o centro da tela atual visível baseando-se no tamanho da janela
+            const rect = virtualCanvas.getBoundingClientRect();
+            const centerX = (window.innerWidth / 2 - rect.left) / currentScale;
+            const centerY = (window.innerHeight / 2 - rect.top) / currentScale;
 
-                            const mediaData = {
-                                id: newId,
-                                url: data.url, // URL local recebida do servidor
-                                x: Math.round(mouseX_inCanvas - canvasPadding),
-                                y: Math.round(mouseY_inCanvas - canvasPadding),
-                                visible: true,
-                                scaleX: 1,
-                                scaleY: 1
-                            };
-
-                            createDraggableElement(mediaData, mouseX_inCanvas, mouseY_inCanvas);
-                            socket.emit('media:create', mediaData);
-                        }
-                    })
-                    .catch(err => {
-                        console.error('Erro no upload:', err);
-                        tooltip.innerHTML = oldHtml;
-                        alert('Erro ao enviar o arquivo.');
-                    });
-                } else {
-                    alert('Formato de arquivo não suportado. Envie Imagens ou Vídeos.');
+            if (e.clipboardData.files && e.clipboardData.files.length > 0) {
+                handleFileUpload(e.clipboardData.files[0], centerX, centerY);
+            } else {
+                let url = extractUrlFromData(e.clipboardData);
+                if (url && (url.startsWith('http') || url.startsWith('data:'))) {
+                    createMediaFromUrl(url, centerX, centerY);
                 }
             }
         });
