@@ -785,17 +785,12 @@
         btnCtxFlipV.title = "Espelhar Vertical";
         btnCtxFlipV.innerText = "↕️";
 
-        const btnCtxRotate = document.createElement('button');
-        btnCtxRotate.title = "Rotacionar 90º";
-        btnCtxRotate.innerText = "🔄";
-
         const btnCtxDuplicate = document.createElement('button');
         btnCtxDuplicate.title = "Duplicar (Ctrl+D)";
         btnCtxDuplicate.innerText = "📄";
 
-        selectionToolbar.insertBefore(btnCtxRotate, btnCtxDelete);
-        selectionToolbar.insertBefore(btnCtxFlipH, btnCtxRotate);
-        selectionToolbar.insertBefore(btnCtxFlipV, btnCtxRotate);
+        selectionToolbar.insertBefore(btnCtxFlipH, btnCtxDelete);
+        selectionToolbar.insertBefore(btnCtxFlipV, btnCtxDelete);
         selectionToolbar.insertBefore(btnCtxDuplicate, btnCtxDelete);
 
         // Carrega as preferências do usuário salvas no navegador
@@ -1491,6 +1486,7 @@
             btnPlayerPlayPause.innerText = '▶️';
             playerSeek.value = 0;
             playerTimeCurrent.innerText = "0:00";
+            socket.emit('audio:pause', { currentTime: 0 });
         });
 
         playerSeek.addEventListener('input', () => {
@@ -2422,11 +2418,20 @@
         let rotateStartRotation = 0;
         let rotateCenterX = 0;
         let rotateCenterY = 0;
+        let rotateStartMediaX = 0;
+        let rotateStartMediaY = 0;
         
         let resizeStartMediaX = 0;
         let resizeStartMediaY = 0;
 
         let lastMouseMoveEmitTime = 0;
+
+        let clickStartX = 0;
+        let clickStartY = 0;
+        let clickTargetIds = [];
+        let clickWasShift = false;
+        let clickHasDragged = false;
+        let clickHadSelection = false;
 
         function createDraggableElement(data, startX, startY) {
             mediaState[data.id] = data; // Salva localmente
@@ -2600,17 +2605,22 @@
                 const uniqueIds = [...new Set(elementsUnderMouse)];
                 let targetId = data.id; // Fallback de segurança
 
-                // Lógica de Revezamento: Se há várias mídias sobrepostas e não estamos segurando Shift
-                if (uniqueIds.length > 1 && !e.shiftKey) {
+                clickStartX = e.clientX;
+                clickStartY = e.clientY;
+                clickTargetIds = uniqueIds;
+                clickWasShift = e.shiftKey;
+                clickHasDragged = false;
+                clickHadSelection = false;
+
+                if (uniqueIds.length > 0) {
                     const currentlySelectedIndex = uniqueIds.findIndex(id => selectedElements.has(id) && selectedElements.size === 1);
-                    if (currentlySelectedIndex !== -1) {
-                        const nextIndex = (currentlySelectedIndex + 1) % uniqueIds.length;
-                        targetId = uniqueIds[nextIndex];
+                    if (currentlySelectedIndex !== -1 && !e.shiftKey) {
+                        targetId = uniqueIds[currentlySelectedIndex];
+                        clickHadSelection = true;
                     } else {
                         targetId = uniqueIds[0];
+                        clickHadSelection = false;
                     }
-                } else if (uniqueIds.length > 0) {
-                    targetId = uniqueIds[0];
                 }
 
                 if (e.shiftKey) {
@@ -2648,6 +2658,10 @@
 
         // Window MouseMove para o arrasto globalmente fluido e Redimensionamento
         window.addEventListener('mousemove', (e) => {
+            if (Math.abs(e.clientX - clickStartX) > 3 || Math.abs(e.clientY - clickStartY) > 3) {
+                clickHasDragged = true;
+            }
+
             // Prepara a emissão da posição do mouse para os outros admins
             const rectVirtual = virtualCanvas.getBoundingClientRect();
             const mouseX_inCanvasGlobal = (e.clientX - rectVirtual.left) / currentScale;
@@ -2836,6 +2850,16 @@
         });
 
         window.addEventListener('mouseup', () => {
+            // Se foi um clique puro (sem arrastar) em elementos sobrepostos, alterna a seleção para a camada de baixo
+            if (!clickHasDragged && clickTargetIds.length > 1 && !clickWasShift && clickHadSelection && !isPanning && !activeResizeElement && !activeRotateElement && !activeCropElement) {
+                const currentlySelectedIndex = clickTargetIds.findIndex(id => selectedElements.has(id) && selectedElements.size === 1);
+                if (currentlySelectedIndex !== -1) {
+                    const nextIndex = (currentlySelectedIndex + 1) % clickTargetIds.length;
+                    selectElement(clickTargetIds[nextIndex], false);
+                }
+            }
+            clickTargetIds = [];
+
             activeDragElements = [];
             activeResizeElement = null;
             activeRotateElement = null;
@@ -2911,24 +2935,6 @@
                 socket.emit('media:toggle_visibility', { id: id, visible: newState });
             });
             if (selectedElements.size === 1) btnCtxHide.innerText = newState ? '👁️ Ocultar' : '🙈 Mostrar';
-        });
-
-        btnCtxRotate.addEventListener('click', () => {
-            if (selectedElements.size !== 1) return;
-            const id = Array.from(selectedElements)[0];
-            if (!mediaState[id]) return;
-            
-            const oldRot = mediaState[id].rotation || 0;
-            setRotationAroundCenter(id, oldRot + 90);
-            applyTransform(id);
-            
-            const container = document.getElementById(`admin-${id}`);
-            if (container) {
-                container.style.left = (mediaState[id].x + canvasPadding) + 'px';
-                container.style.top = (mediaState[id].y + canvasPadding) + 'px';
-            }
-            socket.emit('media:transform_sync', { id: id, rotation: mediaState[id].rotation, flipX: mediaState[id].flipX, flipY: mediaState[id].flipY });
-            socket.emit('media:drag_sync', { id: id, x: mediaState[id].x, y: mediaState[id].y });
         });
 
         btnCtxDuplicate.addEventListener('click', () => {
@@ -3091,6 +3097,8 @@
             rotateCenterY = rect.top + topPos + cy * currentScale;
 
             rotateStartAngle = Math.atan2(e.clientY - rotateCenterY, e.clientX - rotateCenterX);
+            rotateStartMediaX = media.x;
+            rotateStartMediaY = media.y;
         });
 
         // ============================================

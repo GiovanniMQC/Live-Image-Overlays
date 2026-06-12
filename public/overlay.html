@@ -209,6 +209,10 @@
             try { globalAudio.currentTime = data.currentTime; } catch(e){}
         });
 
+        globalAudio.addEventListener('ended', () => {
+            socket.emit('audio:pause', { currentTime: 0 });
+        });
+
         socket.on('audio:volume', (data) => {
             globalAudio.volume = data.volume;
         });
