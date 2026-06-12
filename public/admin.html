@@ -8,7 +8,7 @@
         :root {
             --obs-width: 1920px;
             --obs-height: 1080px;
-            --canvas-padding: 1000px;
+            --canvas-padding: 4000px;
         }
 
         body {
@@ -23,37 +23,144 @@
             overflow: hidden;
         }
 
-        #controls {
-            padding: 15px;
-            background-color: #333;
-            border-bottom: 2px solid #111;
-            display: flex;
-            gap: 10px;
-            align-items: center;
+        #floating-toolbar {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             z-index: 1000;
-            box-shadow: 0px 4px 10px rgba(0,0,0,0.5);
+            display: flex;
+            gap: 15px;
+            pointer-events: none;
         }
 
-        #controls input[type="text"] {
-            flex-grow: 1;
-            padding: 8px;
+        .tool-container {
+            position: relative;
+            pointer-events: auto;
+        }
+
+        .tool-btn {
+            background-color: #2c2c2c;
+            border: 2px solid #444;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 24px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        .tool-btn:hover, .tool-btn.active {
+            background-color: #007bff;
+            border-color: #0056b3;
+            transform: scale(1.1);
+        }
+
+        .tool-panel {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-10px);
+            background-color: #1e1e1e;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.7);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            min-width: 250px;
+        }
+
+        .tool-panel.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .tool-panel h3 {
+            margin: 0;
+            font-size: 14px;
+            color: #aaa;
+            text-transform: uppercase;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .input-group label {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .input-group-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tool-panel input[type="text"] {
+            padding: 8px 10px;
             border-radius: 4px;
-            border: none;
+            border: 1px solid #444;
             background: #111;
             color: #fff;
+            outline: none;
+            width: 100%;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        
+        .tool-panel input[type="text"]:focus {
+            border-color: #007bff;
         }
 
-        #controls button {
-            padding: 8px 15px;
+        .tool-panel input[type="color"] {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border: 1px solid #444;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #111;
+        }
+
+        .tool-panel button {
+            padding: 10px 12px;
             border: none;
             border-radius: 4px;
             background-color: #007bff;
             color: white;
             cursor: pointer;
             font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: background-color 0.2s;
+            width: 100%;
         }
 
-        #controls button:hover { background-color: #0056b3; }
+        .tool-panel button:hover { background-color: #0056b3; }
+        .tool-panel button.btn-success { background-color: #28a745; }
+        .tool-panel button.btn-success:hover { background-color: #218838; }
 
         /* Container que permite rolar (pan) */
         #workspace {
@@ -223,7 +330,7 @@
            Mas como escalonamos, vamos focar no width real. */
         .media-content {
             display: block;
-            pointer-events: none; /* Deixa o mousedown pro container */
+            /* pointer-events: none; REMOVIDO para permitir clique e edição no texto */
             max-width: 500px; /* Tamanho base padrão para inserção */
             max-height: 500px;
         }
@@ -232,11 +339,98 @@
 </head>
 <body>
 
-    <div id="controls">
-        <input type="color" id="admin-color" value="#ff0088" style="width: 40px; height: 35px; padding: 0; border: none; border-radius: 4px; cursor: pointer;" title="Cor do seu Cursor">
-        <input type="text" id="admin-name" placeholder="Seu Nome" style="max-width: 120px;" title="Seu Nome">
-        <input type="text" id="media-url" placeholder="Insira a URL de uma Imagem, GIF ou Vídeo (ex: https://site.com/meme.gif)">
-        <button id="btn-add">Adicionar Mídia</button>
+    <div id="floating-toolbar">
+        <div class="tool-container">
+            <button class="tool-btn" title="Cursor e Perfil" onclick="toggleToolPanel('panel-cursor', this)">🖱️</button>
+            <div id="panel-cursor" class="tool-panel">
+                <h3>🖱️ Seu Cursor</h3>
+                <div class="input-group">
+                    <label>Cor do Cursor</label>
+                    <input type="color" id="admin-color" value="#ff0088" title="Cor do seu Cursor">
+                </div>
+                <div class="input-group">
+                    <label>Seu Nome</label>
+                    <input type="text" id="admin-name" placeholder="Seu Nome" title="Seu Nome">
+                </div>
+            </div>
+        </div>
+        
+        <div class="tool-container">
+            <button class="tool-btn" title="Adicionar Imagem/Vídeo (URL)" onclick="toggleToolPanel('panel-media', this)">🖼️</button>
+            <div id="panel-media" class="tool-panel">
+                <h3>🖼️ Adicionar Mídia</h3>
+                <div class="input-group">
+                    <label>URL (Link)</label>
+                    <input type="text" id="media-url" placeholder="https://site.com/meme.gif">
+                </div>
+                <button id="btn-add">Adicionar Mídia</button>
+            </div>
+        </div>
+
+        <div class="tool-container">
+            <button class="tool-btn" title="Adicionar Texto" onclick="toggleToolPanel('panel-text', this)">🔤</button>
+            <div id="panel-text" class="tool-panel">
+                <h3>🔤 Novo Texto</h3>
+                <div class="input-group">
+                    <label>Conteúdo do Texto</label>
+                    <input type="text" id="text-input" placeholder="Digite seu texto...">
+                </div>
+                <div class="input-group-row">
+                    <div class="input-group" style="flex-grow: 1;">
+                        <label>Cor</label>
+                        <input type="color" id="text-color" value="#ffffff" title="Cor do Texto">
+                    </div>
+                    <button id="btn-add-text" class="btn-success" style="margin-top: 17px;">Adicionar</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="tool-container">
+            <button class="tool-btn" title="Áudio e Efeitos" onclick="toggleToolPanel('panel-audio', this)">🎵</button>
+            <div id="panel-audio" class="tool-panel">
+                <h3>🎵 Player de Áudio</h3>
+                <div class="input-group">
+                    <label>Selecionar Áudio</label>
+                    <select id="audio-select" style="padding: 8px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff; outline: none; width: 100%;">
+                        <option value="https://www.myinstants.com/media/sounds/tada.mp3">🎉 Ta Da!</option>
+                        <option value="https://www.myinstants.com/media/sounds/sad-trombone.mp3">🎺 Triste (Trombone)</option>
+                        <option value="https://www.myinstants.com/media/sounds/crickets.mp3">🦗 Grilos (Silêncio)</option>
+                        <option value="https://www.myinstants.com/media/sounds/errooou.mp3">❌ Errou (Faustão)</option>
+                        <option value="https://www.myinstants.com/media/sounds/vine-boom.mp3">💥 Vine Boom</option>
+                        <option value="custom">🔗 URL Personalizada...</option>
+                    </select>
+                </div>
+                <div class="input-group" id="custom-audio-group" style="display: none;">
+                    <label>URL do Áudio</label>
+                    <input type="text" id="audio-url" placeholder="https://site.com/som.mp3">
+                </div>
+                <div class="input-group-row" style="margin-top: 5px;">
+                    <button id="btn-audio-play" class="btn-success" style="flex: 1;">▶️ Play</button>
+                    <button id="btn-audio-stop" style="flex: 1; background-color: #dc3545;">⏹️ Stop</button>
+                </div>
+                <div class="input-group" style="margin-top: 5px;">
+                    <label>Volume (<span id="audio-vol-label">50%</span>)</label>
+                    <input type="range" id="audio-volume" min="0" max="1" step="0.05" value="0.5" style="width: 100%; cursor: pointer;">
+                </div>
+            </div>
+        </div>
+
+        <div class="tool-container">
+            <button class="tool-btn" title="Ajuda e Atalhos" onclick="toggleToolPanel('panel-help', this)">❓</button>
+            <div id="panel-help" class="tool-panel">
+                <h3>❓ Atalhos e Ajuda</h3>
+                <div style="font-size: 13px; color: #ccc; line-height: 1.8;">
+                    🖱️ <b>Scroll:</b> Zoom na Tela<br>
+                    🖱️ <b>Scroll na Imagem:</b> Escala Uniforme<br>
+                    ⌨️ <b>Shift + Scroll:</b> Esticar na Horizontal<br>
+                    ⌨️ <b>Alt + Scroll:</b> Esticar na Vertical<br>
+                    ⌨️ <b>Delete:</b> Apagar Selecionada<br>
+                    ⌨️ <b>F:</b> Tela Cheia (Selecionada)<br>
+                    ⌨️ <b>H:</b> Ocultar (Selecionada)<br>
+                    🖐️ <b>Arrastar Fundo:</b> Mover Canvas
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="workspace">
@@ -248,14 +442,7 @@
         </div>
     </div>
     
-    <div class="tooltip">
-        🖱️ <b>Scroll (Roda do Mouse):</b> Zoom na Tela<br>
-        🖱️ <b>Scroll sobre a Imagem:</b> Escala Uniforme<br>
-        ⌨️ <b>Shift + Scroll sobre Imagem:</b> Esticar Horizontalmente<br>
-        ⌨️ <b>Alt + Scroll sobre Imagem:</b> Esticar Verticalmente<br>
-        ⌨️ <b>Delete/Backspace:</b> Apagar Imagem Selecionada<br>
-        🖐️ <b>Clique + Arrastar Fundo:</b> Navegar pelo Canvas
-    </div>
+    <div id="upload-toast" class="toast">Fazendo upload do arquivo...</div>
 
     <div id="zoom-controls">
         <span>Zoom da Tela:</span>
@@ -271,15 +458,46 @@
         // Elementos DOM
         const urlInput = document.getElementById('media-url');
         const btnAdd = document.getElementById('btn-add');
+        const textInput = document.getElementById('text-input');
+        const textColorInput = document.getElementById('text-color');
+        const btnAddText = document.getElementById('btn-add-text');
         const virtualCanvas = document.getElementById('virtual-canvas');
         const canvasWrapper = document.getElementById('canvas-wrapper');
         const workspace = document.getElementById('workspace');
         const zoomLevelDisplay = document.getElementById('zoom-level');
         
+        // Controle dos Paineis da Toolbar
+        function toggleToolPanel(panelId, btnElement) {
+            const panel = document.getElementById(panelId);
+            const isCurrentlyActive = panel.classList.contains('active');
+            
+            // Fecha todos os painéis e remove "active" dos botões
+            document.querySelectorAll('.tool-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+
+            if (!isCurrentlyActive) {
+                panel.classList.add('active');
+                btnElement.classList.add('active');
+                // Foco automático se for o painel de texto ou URL
+                const firstInput = panel.querySelector('input[type="text"]');
+                if (firstInput) {
+                    setTimeout(() => firstInput.focus(), 50);
+                }
+            }
+        }
+        
+        // Fechar painéis ao clicar fora
+        document.addEventListener('mousedown', (e) => {
+            if (!e.target.closest('#floating-toolbar')) {
+                document.querySelectorAll('.tool-panel').forEach(p => p.classList.remove('active'));
+                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            }
+        });
+
         // Configurações do layout virtual
         const obsWidth = 1920;
         const obsHeight = 1080;
-        const canvasPadding = 1000;
+        const canvasPadding = 4000;
         let currentScale = 0.3; // Zoom inicial da tela
         
         // Dicionário local para mídias
@@ -330,10 +548,10 @@
         }
 
         window.addEventListener('keydown', (e) => {
-            // Previne atalhos se estiver digitando numa caixa de texto
-            if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+            // Previne atalhos se estiver digitando numa caixa de texto ou elemento de texto editável
+            if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.isContentEditable)) return;
 
-            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementId) {
+            if (e.key === 'Delete' && selectedElementId) {
                 const container = document.getElementById(`admin-${selectedElementId}`);
                 if (container) {
                     container.remove();
@@ -443,7 +661,7 @@
                     clearSelection();
                     
                     // Desfoca qualquer campo de texto para atalhos funcionarem
-                    if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+                    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.isContentEditable)) {
                         document.activeElement.blur();
                     }
                 }
@@ -687,6 +905,35 @@
             urlInput.value = '';
         });
 
+        // Adicionar novo texto
+        btnAddText.addEventListener('click', () => {
+            const text = textInput.value.trim();
+            if (!text) return alert('Por favor, digite um texto.');
+            
+            const color = textColorInput.value;
+            const id = 'media_' + Math.random().toString(36).substring(2, 9);
+            
+            const initialX = canvasPadding - 200; 
+            const initialY = canvasPadding + 100;
+
+            const mediaData = {
+                id: id,
+                type: 'text',
+                text: text,
+                color: color,
+                x: initialX - canvasPadding,
+                y: initialY - canvasPadding,
+                visible: true,
+                scaleX: 1,
+                scaleY: 1,
+                zIndex: 10
+            };
+
+            createDraggableElement(mediaData, initialX, initialY);
+            socket.emit('media:create', mediaData);
+            textInput.value = '';
+        });
+
         // Sync via WebSocket
         socket.on('connect', () => {
             socket.emit('request_state');
@@ -745,6 +992,19 @@
                 mediaState[data.id].zIndex = data.zIndex;
                 const el = document.getElementById(`admin-${data.id}`);
                 if (el) el.style.zIndex = data.zIndex;
+            }
+        });
+
+        socket.on('media:update_text', (data) => {
+            if (mediaState[data.id]) {
+                mediaState[data.id].text = data.text;
+                const el = document.getElementById(`admin-${data.id}`);
+                if (el) {
+                    const contentEl = el.querySelector('.media-content');
+                    if (contentEl && contentEl.contentEditable !== "true") {
+                        contentEl.innerText = data.text;
+                    }
+                }
             }
         });
 
@@ -929,19 +1189,68 @@
 
             // A Mídia em si
             let mediaEl;
-            const isVideo = data.url.match(/\.(mp4|webm|ogg)$/i);
-            if (isVideo) {
-                mediaEl = document.createElement('video');
-                mediaEl.src = data.url;
-                mediaEl.autoplay = true;
-                mediaEl.loop = true;
-                mediaEl.muted = true;
+            if (data.type === 'text') {
+                mediaEl = document.createElement('div');
+                mediaEl.innerText = data.text;
+                mediaEl.style.color = data.color || '#ffffff';
+                mediaEl.style.fontSize = '40px';
+                mediaEl.style.fontFamily = 'Arial, sans-serif';
+                mediaEl.style.fontWeight = 'bold';
+                mediaEl.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
+                mediaEl.style.whiteSpace = 'pre-wrap';
+                mediaEl.style.minWidth = '50px';
+                mediaEl.style.minHeight = '40px';
+                mediaEl.style.outline = 'none';
                 mediaEl.classList.add('media-content');
+
+                mediaEl.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    mediaEl.contentEditable = "true";
+                    mediaEl.style.userSelect = 'text';
+                    mediaEl.style.WebkitUserSelect = 'text';
+                    mediaEl.focus();
+                    mediaEl.style.cursor = 'text';
+                    
+                    const selection = window.getSelection();
+                    const range = document.createRange();
+                    range.selectNodeContents(mediaEl);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                });
+
+                mediaEl.addEventListener('input', () => {
+                    data.text = mediaEl.innerText;
+                    socket.emit('media:update_text', { id: data.id, text: mediaEl.innerText });
+                });
+
+                mediaEl.addEventListener('blur', () => {
+                    mediaEl.contentEditable = "false";
+                    mediaEl.style.userSelect = '';
+                    mediaEl.style.WebkitUserSelect = '';
+                    mediaEl.style.cursor = 'default';
+                    window.getSelection().removeAllRanges();
+                });
+
+                mediaEl.addEventListener('mousedown', (e) => {
+                    if (mediaEl.contentEditable === "true") {
+                        e.stopPropagation();
+                    }
+                });
             } else {
-                mediaEl = document.createElement('img');
-                mediaEl.src = data.url;
-                mediaEl.draggable = false;
-                mediaEl.classList.add('media-content');
+                const isVideo = data.url && data.url.match(/\.(mp4|webm|ogg)$/i);
+                if (isVideo) {
+                    mediaEl = document.createElement('video');
+                    mediaEl.src = data.url;
+                    mediaEl.autoplay = true;
+                    mediaEl.loop = true;
+                    mediaEl.muted = true;
+                    mediaEl.classList.add('media-content');
+                } else {
+                    mediaEl = document.createElement('img');
+                    mediaEl.src = data.url;
+                    mediaEl.draggable = false;
+                    mediaEl.classList.add('media-content');
+                }
             }
 
             container.appendChild(controls);

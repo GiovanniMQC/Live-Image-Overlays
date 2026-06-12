@@ -67,6 +67,16 @@
             }
         });
 
+        socket.on('media:update_text', (data) => {
+            const container = mediaElements[data.id];
+            if (container) {
+                const textEl = container.querySelector('.media-content');
+                if (textEl) {
+                    textEl.innerText = data.text;
+                }
+            }
+        });
+
         socket.on('media:layer_sync', (data) => {
             const el = mediaElements[data.id];
             if (el) {
@@ -107,23 +117,35 @@
             container.style.transform = `scale(${sx}, ${sy})`;
 
             let mediaEl;
-            const isVideo = data.url.match(/\.(mp4|webm|ogg)$/i);
-
-            if (isVideo) {
-                mediaEl = document.createElement('video');
-                mediaEl.src = data.url;
-                mediaEl.autoplay = true;
-                mediaEl.loop = true;
-                mediaEl.muted = true;
+            if (data.type === 'text') {
+                mediaEl = document.createElement('div');
+                mediaEl.innerText = data.text;
+                mediaEl.style.color = data.color || '#ffffff';
+                mediaEl.style.fontSize = '40px';
+                mediaEl.style.fontFamily = 'Arial, sans-serif';
+                mediaEl.style.fontWeight = 'bold';
+                mediaEl.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
+                mediaEl.style.whiteSpace = 'pre-wrap';
+                mediaEl.classList.add('media-content');
             } else {
-                mediaEl = document.createElement('img');
-                mediaEl.src = data.url;
+                const isVideo = data.url && data.url.match(/\.(mp4|webm|ogg)$/i);
+                if (isVideo) {
+                    mediaEl = document.createElement('video');
+                    mediaEl.src = data.url;
+                    mediaEl.autoplay = true;
+                    mediaEl.loop = true;
+                    mediaEl.muted = true;
+                } else {
+                    mediaEl = document.createElement('img');
+                    mediaEl.src = data.url;
+                }
+
+                // Força via style inline para que o OBS (CEF browser) não ignore
+                mediaEl.style.display = 'block';
+                mediaEl.style.maxWidth = '500px';
+                mediaEl.style.maxHeight = '500px';
             }
 
-            // Força via style inline para que o OBS (CEF browser) não ignore
-            mediaEl.style.display = 'block';
-            mediaEl.style.maxWidth = '500px';
-            mediaEl.style.maxHeight = '500px';
             mediaEl.style.pointerEvents = 'none';
             mediaEl.style.userSelect = 'none';
 

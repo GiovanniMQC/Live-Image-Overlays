@@ -48,6 +48,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Estado simples em memória para caso o OBS recarregue a página
 let appState = {};
+let audioState = { url: '', playing: false, currentTime: 0, volume: 0.5 };
 
 io.on('connection', (socket) => {
     console.log('Cliente conectado:', socket.id);
@@ -55,7 +56,33 @@ io.on('connection', (socket) => {
     // Envia o estado atual quando um novo cliente (ex: OBS) conecta
     socket.on('request_state', () => {
         socket.emit('sync_state', Object.values(appState));
+        socket.emit('audio:sync', audioState);
     });
+
+    // ================= AUDIO SYNC =====================
+    socket.on('audio:play', (data) => {
+        audioState.url = data.url;
+        audioState.playing = true;
+        audioState.currentTime = data.currentTime || 0;
+        socket.broadcast.emit('audio:play', audioState);
+    });
+
+    socket.on('audio:pause', (data) => {
+        audioState.playing = false;
+        audioState.currentTime = data.currentTime || 0;
+        socket.broadcast.emit('audio:pause', audioState);
+    });
+
+    socket.on('audio:volume', (data) => {
+        audioState.volume = data.volume;
+        socket.broadcast.emit('audio:volume', audioState);
+    });
+
+    socket.on('audio:seek', (data) => {
+        audioState.currentTime = data.currentTime;
+        socket.broadcast.emit('audio:seek', audioState);
+    });
+    // ==================================================
 
     socket.on('media:create', (data) => {
         data.visible = true; // Por padrão, a mídia recém-criada é visível
@@ -78,6 +105,13 @@ io.on('connection', (socket) => {
             appState[data.id].scaleX = data.scaleX;
             appState[data.id].scaleY = data.scaleY;
             socket.broadcast.emit('media:scale_sync', data);
+        }
+    });
+
+    socket.on('media:update_text', (data) => {
+        if (appState[data.id]) {
+            appState[data.id].text = data.text;
+            socket.broadcast.emit('media:update_text', data);
         }
     });
 
