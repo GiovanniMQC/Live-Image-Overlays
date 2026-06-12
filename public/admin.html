@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Controle - Admin</title>
+    <style>
+        :root {
+            --obs-width: 1920px;
+            --obs-height: 1080px;
+            --canvas-padding: 1000px;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #controls {
+            padding: 15px;
+            background-color: #333;
+            border-bottom: 2px solid #111;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            z-index: 1000;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.5);
+        }
+
+        #controls input[type="text"] {
+            flex-grow: 1;
+            padding: 8px;
+            border-radius: 4px;
+            border: none;
+            background: #111;
+            color: #fff;
+        }
+
+        #controls button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        #controls button:hover { background-color: #0056b3; }
+
+        /* Container que permite rolar (pan) */
+        #workspace {
+            position: relative;
+            flex-grow: 1;
+            overflow: auto;
+            background: #1a1a1a;
+            /* Padrão de grade */
+            background-image: linear-gradient(#2a2a2a 1px, transparent 1px),
+                              linear-gradient(90deg, #2a2a2a 1px, transparent 1px);
+            background-size: 50px 50px;
+            background-position: top left;
+        }
+
+        /* Envolve o canvas virtual para garantir que o scroll do workspace funcione com o scale */
+        #canvas-wrapper {
+            position: absolute;
+            width: calc((var(--obs-width) + var(--canvas-padding) * 2));
+            height: calc((var(--obs-height) + var(--canvas-padding) * 2));
+            transform-origin: top left;
+            /* O transform scale será aplicado aqui via JS */
+        }
+
+        /* O Canvas virtual total com a área extra de "bastidores" */
+        #virtual-canvas {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+        }
+
+        /* A área exata que o OBS captura */
+        #obs-bounds {
+            position: absolute;
+            width: var(--obs-width);
+            height: var(--obs-height);
+            left: var(--canvas-padding);
+            top: var(--canvas-padding);
+            border: 5px solid #ff0055;
+            box-shadow: 0 0 50px rgba(255, 0, 85, 0.3) inset, 0 0 0 9999px rgba(0,0,0,0.4);
+            pointer-events: none;
+            box-sizing: border-box;
+        }
+        
+        #obs-bounds::after {
+            content: 'ÁREA DO OBS (1920x1080) - Tudo fora daqui está invisível no OBS';
+            position: absolute;
+            top: -40px;
+            left: 0;
+            color: #ff0055;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .draggable {
+            position: absolute;
+            cursor: grab;
+            user-select: none;
+            border: 3px solid transparent;
+            transform-origin: top left;
+        }
+
+        .draggable:hover {
+            border: 3px dashed #007bff;
+            z-index: 100;
+        }
+
+        /* Destaque para elemento selecionado no clique para atalhos de teclado */
+        .draggable.selected {
+            border: 3px solid #00ff88;
+            z-index: 101;
+        }
+
+        .draggable:active {
+            cursor: grabbing;
+        }
+
+        .draggable-controls {
+            position: absolute;
+            top: -55px;
+            left: 0;
+            display: flex;
+            gap: 8px;
+            background: rgba(0,0,0,0.9);
+            padding: 8px;
+            border-radius: 8px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+            transform: scale(1); /* Control buttons ignore image scale */
+            transform-origin: bottom left;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+        }
+
+        .draggable:hover .draggable-controls,
+        .draggable.selected .draggable-controls {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .draggable-controls button {
+            background: #555; border: none; color: white; padding: 8px 12px; cursor: pointer; border-radius: 4px; font-size: 15px; display: flex; align-items: center; gap: 5px; font-weight: bold;
+        }
+        .draggable-controls button.btn-hide { background: #d39e00; }
+        .draggable-controls button.btn-delete { background: #dc3545; }
+        .draggable-controls button.btn-layer { background: #17a2b8; }
+
+        .hidden-media {
+            opacity: 0.3 !important;
+            border-color: #d39e00 !important;
+        }
+
+        .resize-handle {
+            position: absolute;
+            bottom: -12px;
+            right: -12px;
+            width: 24px;
+            height: 24px;
+            background: #00ff88;
+            border: 3px solid #222;
+            border-radius: 50%;
+            cursor: nwse-resize;
+            opacity: 0;
+            transition: opacity 0.2s;
+            transform-origin: center center;
+            z-index: 10;
+        }
+
+        .draggable:hover .resize-handle,
+        .draggable.selected .resize-handle {
+            opacity: 1;
+        }
+        
+        /* Dica de scroll */
+        .tooltip {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Zoom controls */
+        #zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: #333;
+            padding: 10px;
+            border-radius: 5px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            z-index: 9999;
+        }
+        
+        #zoom-controls button {
+            background: #555; border: none; color: white; padding: 5px 10px; cursor: pointer;
+        }
+        
+        /* Limita tamanho inicial visual na criação apenas usando estilos de base.
+           Mas como escalonamos, vamos focar no width real. */
+        .media-content {
+            display: block;
+            pointer-events: none; /* Deixa o mousedown pro container */
+            max-width: 500px; /* Tamanho base padrão para inserção */
+            max-height: 500px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <input type="color" id="admin-color" value="#ff0088" style="width: 40px; height: 35px; padding: 0; border: none; border-radius: 4px; cursor: pointer;" title="Cor do seu Cursor">
+        <input type="text" id="admin-name" placeholder="Seu Nome" style="max-width: 120px;" title="Seu Nome">
+        <input type="text" id="media-url" placeholder="Insira a URL de uma Imagem, GIF ou Vídeo (ex: https://site.com/meme.gif)">
+        <button id="btn-add">Adicionar Mídia</button>
+    </div>
+
+    <div id="workspace">
+        <div id="canvas-wrapper">
+            <div id="virtual-canvas">
+                <div id="obs-bounds"></div>
+                <!-- Elementos inseridos aparecerão aqui -->
+            </div>
+        </div>
+    </div>
+    
+    <div class="tooltip">
+        🖱️ <b>Scroll (Roda do Mouse):</b> Zoom na Tela<br>
+        🖱️ <b>Scroll sobre a Imagem:</b> Escala Uniforme<br>
+        ⌨️ <b>Shift + Scroll sobre Imagem:</b> Esticar Horizontalmente<br>
+        ⌨️ <b>Alt + Scroll sobre Imagem:</b> Esticar Verticalmente<br>
+        ⌨️ <b>Delete/Backspace:</b> Apagar Imagem Selecionada<br>
+        🖐️ <b>Clique + Arrastar Fundo:</b> Navegar pelo Canvas
+    </div>
+
+    <div id="zoom-controls">
+        <span>Zoom da Tela:</span>
+        <button id="btn-zoom-out">-</button>
+        <span id="zoom-level">30%</span>
+        <button id="btn-zoom-in">+</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        
+        // Elementos DOM
+        const urlInput = document.getElementById('media-url');
+        const btnAdd = document.getElementById('btn-add');
+        const virtualCanvas = document.getElementById('virtual-canvas');
+        const canvasWrapper = document.getElementById('canvas-wrapper');
+        const workspace = document.getElementById('workspace');
+        const zoomLevelDisplay = document.getElementById('zoom-level');
+        
+        // Configurações do layout virtual
+        const obsWidth = 1920;
+        const obsHeight = 1080;
+        const canvasPadding = 1000;
+        let currentScale = 0.3; // Zoom inicial da tela
+        
+        // Dicionário local para mídias
+        const mediaState = {};
+
+        // Controle de Zoom da Tela
+        function updateScale(newScale, focalX = null, focalY = null) {
+            const oldScale = currentScale;
+            currentScale = Math.max(0.05, Math.min(newScale, 2)); // 5% a 200%
+            zoomLevelDisplay.innerText = Math.round(currentScale * 100) + '%';
+            
+            // Applica o transform
+            canvasWrapper.style.transform = `scale(${currentScale})`;
+            
+            // Se tivermos foco (posição do mouse no scroll), ajustamos o scroll do workspace para dar o zoom no ponto correto
+            if (focalX !== null && focalY !== null) {
+                // Cálculo para manter o mouse no mesmo ponto após o zoom
+                const scaleRatio = currentScale / oldScale;
+                const scrollX = workspace.scrollLeft;
+                const scrollY = workspace.scrollTop;
+                
+                workspace.scrollLeft = (scrollX + focalX) * scaleRatio - focalX;
+                workspace.scrollTop = (scrollY + focalY) * scaleRatio - focalY;
+            }
+        }
+
+        document.getElementById('btn-zoom-in').addEventListener('click', () => updateScale(currentScale + 0.05));
+        document.getElementById('btn-zoom-out').addEventListener('click', () => updateScale(currentScale - 0.05));
+
+        // Inicializa Zoom e Centraliza o OBS Bounds
+        updateScale(currentScale);
+        window.addEventListener('load', () => {
+            // Rola o workspace para centralizar a área do OBS
+            const canvasRealWidth = (obsWidth + canvasPadding * 2) * currentScale;
+            const canvasRealHeight = (obsHeight + canvasPadding * 2) * currentScale;
+            workspace.scrollLeft = (canvasRealWidth - workspace.clientWidth) / 2;
+            workspace.scrollTop = (canvasRealHeight - workspace.clientHeight) / 2;
+        });
+
+        // ============================================
+        // ATALHOS DE TECLADO E SELEÇÃO
+        // ============================================
+        let selectedElementId = null;
+
+        function clearSelection() {
+            document.querySelectorAll('.draggable').forEach(el => el.classList.remove('selected'));
+            selectedElementId = null;
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementId) {
+                // Previne deletar acidentalmente se estiver digitando numa caixa de texto
+                if (document.activeElement.tagName === 'INPUT') return;
+                
+                const container = document.getElementById(`admin-${selectedElementId}`);
+                if (container) {
+                    container.remove();
+                    socket.emit('media:delete', { id: selectedElementId });
+                    delete mediaState[selectedElementId];
+                    selectedElementId = null;
+                }
+            }
+        });
+
+        // ============================================
+        // PAN DO WORKSPACE (Arrastar fundo)
+        // ============================================
+        let isPanning = false;
+        let panStartX, panStartY, scrollStartX, scrollStartY;
+
+        workspace.addEventListener('mousedown', (e) => {
+            // Se clicou direto no wrapper ou canvas (não em mídias) inicia o pan e limpa a seleção
+            if (e.target === workspace || e.target === virtualCanvas || e.target === canvasWrapper || e.target.id === 'obs-bounds') { 
+                if (e.button === 0 || e.button === 1) { // Left or Middle click
+                    isPanning = true;
+                    workspace.style.cursor = 'grabbing';
+                    panStartX = e.clientX;
+                    panStartY = e.clientY;
+                    scrollStartX = workspace.scrollLeft;
+                    scrollStartY = workspace.scrollTop;
+                    e.preventDefault();
+                    
+                    // Clicou no fundo, limpa a imagem selecionada
+                    clearSelection();
+                    
+                    // Desfoca qualquer campo de texto para atalhos funcionarem
+                    if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+                        document.activeElement.blur();
+                    }
+                }
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (isPanning) {
+                const dx = e.clientX - panStartX;
+                const dy = e.clientY - panStartY;
+                workspace.scrollLeft = scrollStartX - dx;
+                workspace.scrollTop = scrollStartY - dy;
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isPanning) {
+                isPanning = false;
+                workspace.style.cursor = 'auto';
+            }
+        });
+
+        // ============================================
+        // UPLOAD POR DRAG & DROP DO PC
+        // ============================================
+        workspace.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            workspace.style.border = '2px dashed #00ff88'; // Feedback visual
+        });
+
+        workspace.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            workspace.style.border = 'none';
+        });
+
+        workspace.addEventListener('drop', (e) => {
+            e.preventDefault();
+            workspace.style.border = 'none';
+
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                const file = e.dataTransfer.files[0];
+                
+                // Aceita apenas imagens ou videos
+                if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    // Mostra um feedback que está enviando (opcional)
+                    const tooltip = document.querySelector('.tooltip');
+                    const oldHtml = tooltip.innerHTML;
+                    tooltip.innerHTML = "<b>Fazendo upload do arquivo...</b>";
+
+                    fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        tooltip.innerHTML = oldHtml; // Restaura
+                        if (data.url) {
+                            const newId = 'media_' + Math.random().toString(36).substring(2, 9);
+                            
+                            // Calcula onde a imagem foi solta no canvas virtual
+                            const rect = virtualCanvas.getBoundingClientRect();
+                            const mouseX_inCanvas = (e.clientX - rect.left) / currentScale;
+                            const mouseY_inCanvas = (e.clientY - rect.top) / currentScale;
+
+                            const mediaData = {
+                                id: newId,
+                                url: data.url, // URL local recebida do servidor
+                                x: Math.round(mouseX_inCanvas - canvasPadding),
+                                y: Math.round(mouseY_inCanvas - canvasPadding),
+                                visible: true,
+                                scaleX: 1,
+                                scaleY: 1
+                            };
+
+                            createDraggableElement(mediaData, mouseX_inCanvas, mouseY_inCanvas);
+                            socket.emit('media:create', mediaData);
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Erro no upload:', err);
+                        tooltip.innerHTML = oldHtml;
+                        alert('Erro ao enviar o arquivo.');
+                    });
+                } else {
+                    alert('Formato de arquivo não suportado. Envie Imagens ou Vídeos.');
+                }
+            }
+        });
+
+        // ============================================
+        // EVENTOS DE SCROLL (WHEEL)
+        // ============================================
+        workspace.addEventListener('wheel', (e) => {
+            // Ignora scroll padrão
+            e.preventDefault();
+            
+            const draggable = e.target.closest('.draggable');
+            if (draggable && !isPanning) {
+                // Redimensionar a Imagem (Scroll sobre a imagem)
+                const id = draggable.id.replace('admin-', '');
+                if (mediaState[id]) {
+                    const zoomAmount = e.deltaY > 0 ? -0.05 : 0.05; // Ajuste sensibilidade aqui
+                    
+                    let sx = mediaState[id].scaleX !== undefined ? mediaState[id].scaleX : (mediaState[id].scale || 1);
+                    let sy = mediaState[id].scaleY !== undefined ? mediaState[id].scaleY : (mediaState[id].scale || 1);
+
+                    if (e.shiftKey) {
+                        sx += zoomAmount; // Esticar Horizontal
+                    } else if (e.altKey) {
+                        sy += zoomAmount; // Esticar Vertical
+                    } else {
+                        sx += zoomAmount;
+                        sy += zoomAmount;
+                    }
+
+                    sx = Math.max(0.1, Math.min(sx, 10)); // Limites de escala
+                    sy = Math.max(0.1, Math.min(sy, 10));
+
+                    mediaState[id].scaleX = sx;
+                    mediaState[id].scaleY = sy;
+                    draggable.style.transform = `scale(${sx}, ${sy})`;
+                    
+                    // Ajusta escala invertida dos controles para eles não ficarem gigantes/minúsculos
+                    const controls = draggable.querySelector('.draggable-controls');
+                    if (controls) {
+                        controls.style.transform = `scale(${1 / sx}, ${1 / sy})`;
+                    }
+                    const resizeHandle = draggable.querySelector('.resize-handle');
+                    if (resizeHandle) {
+                        resizeHandle.style.transform = `scale(${1 / sx}, ${1 / sy})`;
+                    }
+
+                    // Envia para o OBS
+                    socket.emit('media:scale_sync', { id: id, scaleX: sx, scaleY: sy });
+                }
+            } else {
+                // Zoom na Tela (Canvas)
+                const zoomAmount = e.deltaY > 0 ? -0.05 : 0.05;
+                // Pegar posição do mouse relativa à janela para servir de âncora
+                const rect = workspace.getBoundingClientRect();
+                const focalX = e.clientX - rect.left;
+                const focalY = e.clientY - rect.top;
+                updateScale(currentScale + zoomAmount, focalX, focalY);
+            }
+        }, { passive: false });
+
+
+        // Adicionar nova mídia
+        btnAdd.addEventListener('click', () => {
+            const url = urlInput.value.trim();
+            if (!url) return alert('Por favor, insira uma URL válida.');
+            
+            const id = 'media_' + Math.random().toString(36).substring(2, 9);
+            
+            // Posição inicial: na borda esquerda dos "bastidores", com offset visível
+            const initialX = canvasPadding - 200; 
+            const initialY = canvasPadding + 100;
+
+            const mediaData = {
+                id: id,
+                url: url,
+                x: initialX - canvasPadding,
+                y: initialY - canvasPadding,
+                visible: true,
+                scaleX: 1,
+                scaleY: 1,
+                zIndex: 10
+            };
+
+            createDraggableElement(mediaData, initialX, initialY);
+            socket.emit('media:create', mediaData);
+            urlInput.value = '';
+        });
+
+        // Sync via WebSocket
+        socket.on('connect', () => {
+            socket.emit('request_state');
+        });
+
+        socket.on('sync_state', (stateList) => {
+            document.querySelectorAll('.draggable').forEach(el => el.remove());
+            
+            stateList.forEach(data => {
+                const canvasX = data.x + canvasPadding;
+                const canvasY = data.y + canvasPadding;
+                createDraggableElement(data, canvasX, canvasY);
+            });
+        });
+
+        // ============================================
+        // SINCRONIZAÇÃO EM TEMPO REAL ENTRE ADMINS
+        // ============================================
+        socket.on('media:create', (data) => {
+            if (!mediaState[data.id]) {
+                const canvasX = data.x + canvasPadding;
+                const canvasY = data.y + canvasPadding;
+                createDraggableElement(data, canvasX, canvasY);
+            }
+        });
+
+        socket.on('media:drag_sync', (data) => {
+            if (mediaState[data.id]) {
+                mediaState[data.id].x = data.x;
+                mediaState[data.id].y = data.y;
+                const el = document.getElementById(`admin-${data.id}`);
+                if (el) {
+                    el.style.left = (data.x + canvasPadding) + 'px';
+                    el.style.top = (data.y + canvasPadding) + 'px';
+                }
+            }
+        });
+
+        socket.on('media:scale_sync', (data) => {
+            if (mediaState[data.id]) {
+                mediaState[data.id].scaleX = data.scaleX;
+                mediaState[data.id].scaleY = data.scaleY;
+                const el = document.getElementById(`admin-${data.id}`);
+                if (el) {
+                    el.style.transform = `scale(${data.scaleX}, ${data.scaleY})`;
+                    const controls = el.querySelector('.draggable-controls');
+                    if (controls) controls.style.transform = `scale(${1 / data.scaleX}, ${1 / data.scaleY})`;
+                    const resizeHandle = el.querySelector('.resize-handle');
+                    if (resizeHandle) resizeHandle.style.transform = `scale(${1 / data.scaleX}, ${1 / data.scaleY})`;
+                }
+            }
+        });
+
+        socket.on('media:layer_sync', (data) => {
+            if (mediaState[data.id]) {
+                mediaState[data.id].zIndex = data.zIndex;
+                const el = document.getElementById(`admin-${data.id}`);
+                if (el) el.style.zIndex = data.zIndex;
+            }
+        });
+
+        socket.on('media:toggle_visibility', (data) => {
+            if (mediaState[data.id]) {
+                mediaState[data.id].visible = data.visible;
+                const el = document.getElementById(`admin-${data.id}`);
+                if (el) {
+                    const btnVisibility = el.querySelector('.btn-hide');
+                    if (data.visible) {
+                        el.classList.remove('hidden-media');
+                        if (btnVisibility) btnVisibility.innerText = '👁️ Ocultar';
+                    } else {
+                        el.classList.add('hidden-media');
+                        if (btnVisibility) btnVisibility.innerText = '🙈 Mostrar';
+                    }
+                }
+            }
+        });
+
+        socket.on('media:delete', (data) => {
+            if (mediaState[data.id]) {
+                delete mediaState[data.id];
+                const el = document.getElementById(`admin-${data.id}`);
+                if (el) {
+                    if (selectedElementId === data.id) selectedElementId = null;
+                    if (activeDragElement && activeDragElement.id === data.id) activeDragElement = null;
+                    if (activeResizeElement && activeResizeElement.id === data.id) activeResizeElement = null;
+                    el.remove();
+                }
+            }
+        });
+
+        // Lógica de Drag & Drop da Mídia
+        let activeDragElement = null;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+
+        // Lógica de Redimensionamento pelas bordas
+        let activeResizeElement = null;
+        let resizeStartMouseX = 0;
+        let resizeStartMouseY = 0;
+        let resizeStartScaleX = 1;
+        let resizeStartScaleY = 1;
+        let resizeBaseWidth = 0;
+        let resizeBaseHeight = 0;
+
+        function createDraggableElement(data, startX, startY) {
+            mediaState[data.id] = data; // Salva localmente
+
+            const container = document.createElement('div');
+            container.classList.add('draggable');
+            container.id = `admin-${data.id}`;
+            container.style.left = startX + 'px';
+            container.style.top = startY + 'px';
+            container.style.zIndex = data.zIndex !== undefined ? data.zIndex : 10;
+            
+            const sx = data.scaleX !== undefined ? data.scaleX : (data.scale || 1);
+            const sy = data.scaleY !== undefined ? data.scaleY : (data.scale || 1);
+            container.style.transform = `scale(${sx}, ${sy})`;
+            
+            if (!data.visible) container.classList.add('hidden-media');
+
+            // Handle de redimensionamento no canto inferior direito
+            const resizeHandle = document.createElement('div');
+            resizeHandle.classList.add('resize-handle');
+            // Mantém tamanho fixo independente do zoom da imagem
+            resizeHandle.style.transform = `scale(${1 / sx}, ${1 / sy})`;
+            
+            resizeHandle.addEventListener('mousedown', (e) => {
+                e.stopPropagation(); // Impede que o clique inicie o Drag (Mover imagem)
+                e.preventDefault();
+                
+                clearSelection();
+                container.classList.add('selected');
+                selectedElementId = data.id;
+
+                activeResizeElement = {
+                    element: container,
+                    id: data.id,
+                    handle: resizeHandle
+                };
+
+                resizeStartMouseX = e.clientX;
+                resizeStartMouseY = e.clientY;
+                
+                resizeStartScaleX = mediaState[data.id].scaleX !== undefined ? mediaState[data.id].scaleX : (mediaState[data.id].scale || 1);
+                resizeStartScaleY = mediaState[data.id].scaleY !== undefined ? mediaState[data.id].scaleY : (mediaState[data.id].scale || 1);
+                
+                // Largura nativa real antes do CSS Scale atuar
+                const contentEl = container.querySelector('.media-content');
+                resizeBaseWidth = contentEl ? contentEl.offsetWidth : 100;
+                resizeBaseHeight = contentEl ? contentEl.offsetHeight : 100;
+            });
+
+            container.appendChild(resizeHandle);
+
+            // Barra de controles (Ocultar / Deletar)
+            const controls = document.createElement('div');
+            controls.classList.add('draggable-controls');
+            // Mantém os botões em escala legível
+            controls.style.transform = `scale(${1 / sx}, ${1 / sy})`;
+
+            const btnLayerUp = document.createElement('button');
+            btnLayerUp.classList.add('btn-layer');
+            btnLayerUp.innerText = '⏫';
+            btnLayerUp.title = 'Trazer para Frente';
+            btnLayerUp.addEventListener('click', () => {
+                let maxOtherZ = -Infinity;
+                for (let key in mediaState) {
+                    if (key !== data.id) {
+                        let otherZ = mediaState[key].zIndex !== undefined ? mediaState[key].zIndex : 10;
+                        if (otherZ > maxOtherZ) maxOtherZ = otherZ;
+                    }
+                }
+                
+                let currentZ = mediaState[data.id].zIndex !== undefined ? mediaState[data.id].zIndex : 10;
+
+                // Se houverem outras imagens e eu não estiver estritamente acima delas, salto pra cima
+                if (maxOtherZ !== -Infinity && currentZ <= maxOtherZ) {
+                    let z = maxOtherZ + 1;
+                    mediaState[data.id].zIndex = z;
+                    container.style.zIndex = z;
+                    socket.emit('media:layer_sync', { id: data.id, zIndex: z });
+                }
+            });
+
+            const btnLayerDown = document.createElement('button');
+            btnLayerDown.classList.add('btn-layer');
+            btnLayerDown.innerText = '⏬';
+            btnLayerDown.title = 'Enviar para Trás';
+            btnLayerDown.addEventListener('click', () => {
+                let minOtherZ = Infinity;
+                for (let key in mediaState) {
+                    if (key !== data.id) {
+                        let otherZ = mediaState[key].zIndex !== undefined ? mediaState[key].zIndex : 10;
+                        if (otherZ < minOtherZ) minOtherZ = otherZ;
+                    }
+                }
+                
+                let currentZ = mediaState[data.id].zIndex !== undefined ? mediaState[data.id].zIndex : 10;
+
+                // Se houverem outras imagens e eu não estiver estritamente abaixo delas, salto pra baixo
+                if (minOtherZ !== Infinity && currentZ >= minOtherZ) {
+                    let z = minOtherZ - 1;
+                    mediaState[data.id].zIndex = z;
+                    container.style.zIndex = z;
+                    socket.emit('media:layer_sync', { id: data.id, zIndex: z });
+                }
+            });
+            
+            const btnVisibility = document.createElement('button');
+            btnVisibility.classList.add('btn-hide');
+            btnVisibility.innerText = data.visible ? '👁️ Ocultar' : '🙈 Mostrar';
+            
+            btnVisibility.addEventListener('click', () => {
+                data.visible = !data.visible;
+                if (data.visible) {
+                    container.classList.remove('hidden-media');
+                    btnVisibility.innerText = '👁️ Ocultar';
+                } else {
+                    container.classList.add('hidden-media');
+                    btnVisibility.innerText = '🙈 Mostrar';
+                }
+                socket.emit('media:toggle_visibility', { id: data.id, visible: data.visible });
+            });
+
+            const btnDelete = document.createElement('button');
+            btnDelete.classList.add('btn-delete');
+            btnDelete.innerText = '🗑️ Excluir';
+            
+            btnDelete.addEventListener('click', () => {
+                container.remove();
+                delete mediaState[data.id];
+                socket.emit('media:delete', { id: data.id });
+            });
+
+            controls.appendChild(btnLayerUp);
+            controls.appendChild(btnLayerDown);
+            controls.appendChild(btnVisibility);
+            controls.appendChild(btnDelete);
+
+            // A Mídia em si
+            let mediaEl;
+            const isVideo = data.url.match(/\.(mp4|webm|ogg)$/i);
+            if (isVideo) {
+                mediaEl = document.createElement('video');
+                mediaEl.src = data.url;
+                mediaEl.autoplay = true;
+                mediaEl.loop = true;
+                mediaEl.muted = true;
+                mediaEl.classList.add('media-content');
+            } else {
+                mediaEl = document.createElement('img');
+                mediaEl.src = data.url;
+                mediaEl.draggable = false;
+                mediaEl.classList.add('media-content');
+            }
+
+            container.appendChild(controls);
+            container.appendChild(mediaEl);
+            virtualCanvas.appendChild(container);
+
+            // Eventos do mouse para arrastar a imagem
+            container.addEventListener('mousedown', (e) => {
+                if (e.target.tagName === 'BUTTON') return;
+                
+                // Tira o foco de caixas de texto para permitir os atalhos de teclado funcionarem
+                if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+                    document.activeElement.blur();
+                }
+
+                // Lida com seleção
+                clearSelection();
+                container.classList.add('selected');
+                selectedElementId = data.id;
+
+                activeDragElement = {
+                    element: container,
+                    id: data.id
+                };
+                
+                // Em vez de usar offsetX, calculamos a posição do mouse relativa à posição top/left real da div escalonada.
+                // A posição left e top representam o canto superior esquerdo (mesmo escalonado, pois transform-origin é top left).
+                const rect = virtualCanvas.getBoundingClientRect();
+                
+                // mouseX no mundo não-escalonado do virtual-canvas
+                const mouseX_inCanvas = (e.clientX - rect.left) / currentScale;
+                const mouseY_inCanvas = (e.clientY - rect.top) / currentScale;
+                
+                const elementLeft = parseFloat(container.style.left);
+                const elementTop = parseFloat(container.style.top);
+
+                dragOffsetX = mouseX_inCanvas - elementLeft;
+                dragOffsetY = mouseY_inCanvas - elementTop;
+            });
+        }
+
+        // Window MouseMove para o arrasto globalmente fluido e Redimensionamento
+        window.addEventListener('mousemove', (e) => {
+            // Emite a posição do mouse para os outros admins
+            const rectVirtual = virtualCanvas.getBoundingClientRect();
+            const mouseX_inCanvasGlobal = (e.clientX - rectVirtual.left) / currentScale;
+            const mouseY_inCanvasGlobal = (e.clientY - rectVirtual.top) / currentScale;
+            
+            socket.emit('admin:mousemove', {
+                id: socket.id,
+                x: mouseX_inCanvasGlobal,
+                y: mouseY_inCanvasGlobal,
+                name: document.getElementById('admin-name').value,
+                color: document.getElementById('admin-color').value
+            });
+
+            if (activeResizeElement && !isPanning) {
+                const dx = e.clientX - resizeStartMouseX;
+                const dy = e.clientY - resizeStartMouseY;
+                
+                // Converter para a escala do canvas virtual
+                const canvasDx = dx / currentScale;
+                const canvasDy = dy / currentScale;
+
+                let newSx = resizeStartScaleX + (canvasDx / resizeBaseWidth);
+                let newSy = resizeStartScaleY + (canvasDy / resizeBaseHeight);
+
+                // Travar proporção se segurar Shift
+                if (e.shiftKey) {
+                    // Usa a variação do eixo X para guiar a escala proporcionalmente
+                    const ratio = newSx / resizeStartScaleX;
+                    newSx = resizeStartScaleX * ratio;
+                    newSy = resizeStartScaleY * ratio;
+                }
+
+                newSx = Math.max(0.1, Math.min(newSx, 20));
+                newSy = Math.max(0.1, Math.min(newSy, 20));
+
+                mediaState[activeResizeElement.id].scaleX = newSx;
+                mediaState[activeResizeElement.id].scaleY = newSy;
+                
+                activeResizeElement.element.style.transform = `scale(${newSx}, ${newSy})`;
+                
+                const controls = activeResizeElement.element.querySelector('.draggable-controls');
+                if (controls) controls.style.transform = `scale(${1 / newSx}, ${1 / newSy})`;
+                
+                if (activeResizeElement.handle) activeResizeElement.handle.style.transform = `scale(${1 / newSx}, ${1 / newSy})`;
+
+                socket.emit('media:scale_sync', { id: activeResizeElement.id, scaleX: newSx, scaleY: newSy });
+                return; // Pula o código de arrastar a imagem
+            }
+
+            if (activeDragElement && !isPanning) {
+                const rect = virtualCanvas.getBoundingClientRect();
+                
+                // Transforma as coordenadas da tela real do mouse nas coordenadas "brutas" do virtual-canvas
+                const mouseX_inCanvas = (e.clientX - rect.left) / currentScale;
+                const mouseY_inCanvas = (e.clientY - rect.top) / currentScale;
+
+                // Aplica o offset de onde o usuário "pegou" na imagem
+                const newLeft = mouseX_inCanvas - dragOffsetX;
+                const newTop = mouseY_inCanvas - dragOffsetY;
+
+                activeDragElement.element.style.left = newLeft + 'px';
+                activeDragElement.element.style.top = newTop + 'px';
+
+                // Dispara WebSocket em ALTA FREQUÊNCIA para o efeito "orgânico" no OBS
+                socket.emit('media:drag_sync', {
+                    id: activeDragElement.id,
+                    x: Math.round(newLeft - canvasPadding),
+                    y: Math.round(newTop - canvasPadding)
+                });
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            activeDragElement = null;
+            activeResizeElement = null;
+        });
+        
+        window.addEventListener('mouseleave', () => {
+            activeDragElement = null;
+            activeResizeElement = null;
+        });
+
+        // ============================================
+        // CURSORES DOS OUTROS ADMINS
+        // ============================================
+        const cursors = {};
+
+        socket.on('admin:mousemove', (data) => {
+            // Ignora se for o próprio mouse (o socket.id no client nem sempre está disponível de imediato, mas temos a garantia pelo broadcast)
+            if (data.id === socket.id) return;
+
+            if (!cursors[data.id]) {
+                const cursorEl = document.createElement('div');
+                cursorEl.style.position = 'absolute';
+                cursorEl.style.pointerEvents = 'none';
+                cursorEl.style.zIndex = '99999';
+                cursorEl.style.transformOrigin = 'top left';
+                // Remove a escala local do container para não ficar gigante/pequeno demais?
+                // Como ele está dentro do virtual-canvas, ele será escalado junto com o canvas.
+                // Mas talvez seja melhor que ele tenha um tamanho fixo visual.
+                // Vamos tentar deixar que escale para ficar simples, ou aplicar um transform inverso.
+                
+                const svg = document.createElement('div');
+                svg.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5));">
+<path d="M4.5 3L20 10.5L13.5 13.5L10.5 20L4.5 3Z" fill="${data.color}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>`;
+                const nameLabel = document.createElement('div');
+                nameLabel.style.backgroundColor = data.color;
+                nameLabel.style.color = 'white';
+                nameLabel.style.padding = '2px 6px';
+                nameLabel.style.borderRadius = '4px';
+                nameLabel.style.fontSize = '12px';
+                nameLabel.style.marginTop = '-5px';
+                nameLabel.style.marginLeft = '12px';
+                nameLabel.style.whiteSpace = 'nowrap';
+                nameLabel.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+                nameLabel.innerText = data.name || 'Admin';
+
+                cursorEl.appendChild(svg);
+                cursorEl.appendChild(nameLabel);
+                virtualCanvas.appendChild(cursorEl);
+
+                cursors[data.id] = {
+                    element: cursorEl,
+                    nameLabel: nameLabel,
+                    svgPath: svg.querySelector('path')
+                };
+            }
+
+            // Manter tamanho visual do cursor independente do zoom do canvas
+            cursors[data.id].element.style.transform = `scale(${1 / currentScale})`;
+            cursors[data.id].element.style.left = data.x + 'px';
+            cursors[data.id].element.style.top = data.y + 'px';
+            
+            // Atualizar nome/cor se mudou
+            cursors[data.id].nameLabel.innerText = data.name || 'Admin';
+            cursors[data.id].nameLabel.style.backgroundColor = data.color;
+            cursors[data.id].svgPath.setAttribute('fill', data.color);
+        });
+
+        socket.on('admin:disconnect', (id) => {
+            if (cursors[id]) {
+                cursors[id].element.remove();
+                delete cursors[id];
+            }
+        });
+
+    </script>
+</body>
+</html>

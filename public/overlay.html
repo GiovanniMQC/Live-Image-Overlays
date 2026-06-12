@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-width=1.0">
+    <title>OBS Overlay - Live Image</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            /* Fundo transparente para o OBS */
+            background-color: transparent;
+            overflow: hidden;
+            width: 1920px;
+            height: 1080px;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        
+        // Elementos atualmente no DOM
+        const mediaElements = {};
+
+        // Ao conectar, pede o estado atual ao servidor para exibir o que já está na tela
+        socket.on('connect', () => {
+            console.log('Conectado ao servidor de Overlay');
+            socket.emit('request_state');
+        });
+
+        socket.on('sync_state', (stateList) => {
+            // Limpa elementos atuais no dom
+            Object.values(mediaElements).forEach(el => el.remove());
+            for(let key in mediaElements) delete mediaElements[key];
+
+            stateList.forEach(data => createOrUpdateMedia(data));
+        });
+
+        socket.on('media:create', (data) => {
+            createOrUpdateMedia(data);
+        });
+
+        socket.on('media:drag_sync', (data) => {
+            const el = mediaElements[data.id];
+            if (el) {
+                el.style.left = data.x + 'px';
+                el.style.top = data.y + 'px';
+            }
+        });
+
+        socket.on('media:scale_sync', (data) => {
+            const el = mediaElements[data.id];
+            if (el) {
+                const sx = data.scaleX !== undefined ? data.scaleX : (data.scale || 1);
+                const sy = data.scaleY !== undefined ? data.scaleY : (data.scale || 1);
+                el.style.transform = `scale(${sx}, ${sy})`;
+                // Definir a origem do transform para top left faz com que o redimensionamento a partir do x, y seja previsível
+                el.style.transformOrigin = 'top left'; 
+            }
+        });
+
+        socket.on('media:layer_sync', (data) => {
+            const el = mediaElements[data.id];
+            if (el) {
+                el.style.zIndex = data.zIndex !== undefined ? data.zIndex : 10;
+            }
+        });
+
+        socket.on('media:toggle_visibility', (data) => {
+            const el = mediaElements[data.id];
+            if (el) {
+                el.style.display = data.visible ? 'block' : 'none';
+            }
+        });
+
+        socket.on('media:delete', (data) => {
+            const el = mediaElements[data.id];
+            if (el) {
+                el.remove();
+                delete mediaElements[data.id];
+            }
+        });
+
+        function createOrUpdateMedia(data) {
+            if (mediaElements[data.id]) return;
+
+            // Cria um container (wrapper) idêntico ao que existe no Admin
+            const container = document.createElement('div');
+            container.id = `media-${data.id}`;
+            container.style.position = 'absolute';
+            container.style.left = data.x + 'px';
+            container.style.top = data.y + 'px';
+            container.style.display = data.visible ? 'block' : 'none';
+            container.style.transformOrigin = 'top left';
+            container.style.zIndex = data.zIndex !== undefined ? data.zIndex : 10;
+            
+            const sx = data.scaleX !== undefined ? data.scaleX : (data.scale || 1);
+            const sy = data.scaleY !== undefined ? data.scaleY : (data.scale || 1);
+            container.style.transform = `scale(${sx}, ${sy})`;
+
+            let mediaEl;
+            const isVideo = data.url.match(/\.(mp4|webm|ogg)$/i);
+
+            if (isVideo) {
+                mediaEl = document.createElement('video');
+                mediaEl.src = data.url;
+                mediaEl.autoplay = true;
+                mediaEl.loop = true;
+                mediaEl.muted = true;
+            } else {
+                mediaEl = document.createElement('img');
+                mediaEl.src = data.url;
+            }
+
+            // Força via style inline para que o OBS (CEF browser) não ignore
+            mediaEl.style.display = 'block';
+            mediaEl.style.maxWidth = '500px';
+            mediaEl.style.maxHeight = '500px';
+            mediaEl.style.pointerEvents = 'none';
+            mediaEl.style.userSelect = 'none';
+
+            container.appendChild(mediaEl);
+            document.body.appendChild(container);
+            
+            mediaElements[data.id] = container;
+        }
+    </script>
+</body>
+</html>
