@@ -43,6 +43,17 @@ app.post('/upload', upload.single('file'), (req, res) => {
     res.json({ url: '/uploads/' + req.file.filename });
 });
 
+// Endpoint para listar os áudios upados
+app.get('/api/audio-uploads', (req, res) => {
+    try {
+        const files = fs.readdirSync(uploadsDir);
+        const audioFiles = files.filter(f => f.match(/\.(mp3|wav|ogg|aac|m4a)$/i));
+        res.json(audioFiles.map(f => '/uploads/' + f));
+    } catch(e) {
+        res.json([]);
+    }
+});
+
 // Serve static files from 'public' folder
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -64,23 +75,24 @@ io.on('connection', (socket) => {
         audioState.url = data.url;
         audioState.playing = true;
         audioState.currentTime = data.currentTime || 0;
-        socket.broadcast.emit('audio:play', audioState);
+        // io.emit manda pra TODOS conectados, inclusive quem enviou. Como o admin tbm ouve o proprio áudio isso não tem problema e garante que chega na overlay.
+        io.emit('audio:play', audioState);
     });
 
     socket.on('audio:pause', (data) => {
         audioState.playing = false;
         audioState.currentTime = data.currentTime || 0;
-        socket.broadcast.emit('audio:pause', audioState);
+        io.emit('audio:pause', audioState);
     });
 
     socket.on('audio:volume', (data) => {
         audioState.volume = data.volume;
-        socket.broadcast.emit('audio:volume', audioState);
+        io.emit('audio:volume', audioState);
     });
 
     socket.on('audio:seek', (data) => {
         audioState.currentTime = data.currentTime;
-        socket.broadcast.emit('audio:seek', audioState);
+        io.emit('audio:seek', audioState);
     });
     // ==================================================
 

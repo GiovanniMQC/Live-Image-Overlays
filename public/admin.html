@@ -335,6 +335,37 @@
             max-height: 500px;
         }
 
+        #upload-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 99999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s;
+        }
+        #upload-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .spinner {
+            border: 6px solid #333;
+            border-top: 6px solid #007bff;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -397,6 +428,7 @@
                         <option value="https://www.myinstants.com/media/sounds/crickets.mp3">🦗 Grilos (Silêncio)</option>
                         <option value="https://www.myinstants.com/media/sounds/errooou.mp3">❌ Errou (Faustão)</option>
                         <option value="https://www.myinstants.com/media/sounds/vine-boom.mp3">💥 Vine Boom</option>
+                        <optgroup id="uploaded-audios" label="📂 Uploads"></optgroup>
                         <option value="custom">🔗 URL Personalizada...</option>
                     </select>
                 </div>
@@ -404,6 +436,8 @@
                     <label>URL do Áudio</label>
                     <input type="text" id="audio-url" placeholder="https://site.com/som.mp3">
                 </div>
+                <button id="btn-upload-audio" style="background-color: #17a2b8; margin-top: 5px;">📤 Enviar Áudio do PC</button>
+                <input type="file" id="audio-file-input" accept="audio/*" style="display: none;">
                 <div class="input-group-row" style="margin-top: 5px;">
                     <button id="btn-audio-play" class="btn-success" style="flex: 1;">▶️ Play</button>
                     <button id="btn-audio-stop" style="flex: 1; background-color: #dc3545;">⏹️ Stop</button>
@@ -442,7 +476,10 @@
         </div>
     </div>
     
-    <div id="upload-toast" class="toast">Fazendo upload do arquivo...</div>
+    <div id="upload-overlay">
+        <div class="spinner"></div>
+        <h2 id="upload-text">Fazendo upload do arquivo...</h2>
+    </div>
 
     <div id="zoom-controls">
         <span>Zoom da Tela:</span>
@@ -466,6 +503,153 @@
         const workspace = document.getElementById('workspace');
         const zoomLevelDisplay = document.getElementById('zoom-level');
         
+        // Elementos do Audio Player
+        const audioSelect = document.getElementById('audio-select');
+        const customAudioGroup = document.getElementById('custom-audio-group');
+        const audioUrlInput = document.getElementById('audio-url');
+        const btnAudioPlay = document.getElementById('btn-audio-play');
+        const btnAudioStop = document.getElementById('btn-audio-stop');
+        const audioVolume = document.getElementById('audio-volume');
+        const audioVolLabel = document.getElementById('audio-vol-label');
+        
+        let globalAudio = new Audio();
+        
+        // Carrega áudios do servidor
+        function loadAudioUploads() {
+            fetch('/api/audio-uploads')
+            .then(res => res.json())
+            .then(urls => {
+                const optgroup = document.getElementById('uploaded-audios');
+                optgroup.innerHTML = '';
+                urls.forEach(url => {
+                    const option = document.createElement('option');
+                    option.value = url;
+                    const filename = url.split('/').pop();
+                    option.innerText = '🎵 ' + filename;
+                    optgroup.appendChild(option);
+                });
+            })
+            .catch(e => console.error("Erro ao carregar áudios:", e));
+        }
+
+        window.addEventListener('load', loadAudioUploads);
+
+        // Upload de Áudio pelo botão
+        document.getElementById('btn-upload-audio').addEventListener('click', () => {
+            document.getElementById('audio-file-input').click();
+        });
+
+        document.getElementById('audio-file-input').addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const overlay = document.getElementById('upload-overlay');
+                document.getElementById('upload-text').innerText = "Enviando áudio...";
+                overlay.classList.add('show');
+
+                fetch('/upload', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    overlay.classList.remove('show');
+                    if (data.url) {
+                        loadAudioUploads();
+                        setTimeout(() => {
+                            audioSelect.value = data.url;
+                            customAudioGroup.style.display = 'none';
+                        }, 500);
+                    }
+                })
+                .catch(err => {
+                    overlay.classList.remove('show');
+                    alert('Erro no upload de áudio.');
+                });
+                
+                // Reseta o input para permitir enviar o mesmo arquivo novamente
+                e.target.value = '';
+            }
+        });
+
+        audioSelect.addEventListener('change', () => {
+            if (audioSelect.value === 'custom') {
+                customAudioGroup.style.display = 'flex';
+            } else {
+                customAudioGroup.style.display = 'none';
+            }
+        });
+
+        audioVolume.addEventListener('input', () => {
+            const vol = parseFloat(audioVolume.value);
+            audioVolLabel.innerText = Math.round(vol * 100) + '%';
+            globalAudio.volume = vol;
+            socket.emit('audio:volume', { volume: vol });
+        });
+
+        btnAudioPlay.addEventListener('click', () => {
+            let url = audioSelect.value === 'custom' ? audioUrlInput.value.trim() : audioSelect.value;
+            if (!url) return alert('Insira uma URL de áudio válida.');
+            
+            // O próprio io.emit do servidor vai disparar o "audio:play" para nós e pro OBS.
+            socket.emit('audio:play', { url: url, currentTime: 0 });
+        });
+
+        btnAudioStop.addEventListener('click', () => {
+            socket.emit('audio:pause', { currentTime: 0 });
+        });
+
+        function playAudioWithState(data) {
+            const playNow = () => {
+                try { globalAudio.currentTime = data.currentTime || 0; } catch(e){}
+                globalAudio.play().catch(e => console.error(e));
+            };
+            
+            if (data.url) {
+                const fullUrl = new URL(data.url, window.location.origin).href;
+                if (globalAudio.src !== fullUrl) {
+                    globalAudio.src = data.url;
+                    globalAudio.onloadedmetadata = () => {
+                        globalAudio.onloadedmetadata = null;
+                        if (data.playing !== false) playNow();
+                    };
+                    return;
+                }
+            }
+            if (data.playing !== false) playNow();
+        }
+
+        socket.on('audio:sync', (data) => {
+            audioVolume.value = data.volume;
+            audioVolLabel.innerText = Math.round(data.volume * 100) + '%';
+            globalAudio.volume = data.volume;
+            
+            if (data.playing) {
+                playAudioWithState(data);
+            } else {
+                if (data.url) {
+                    const fullUrl = new URL(data.url, window.location.origin).href;
+                    if (globalAudio.src !== fullUrl) globalAudio.src = data.url;
+                }
+                globalAudio.pause();
+                try { globalAudio.currentTime = data.currentTime || 0; } catch(e){}
+            }
+        });
+
+        socket.on('audio:play', (data) => {
+            playAudioWithState(data);
+        });
+
+        socket.on('audio:pause', (data) => {
+            globalAudio.pause();
+            try { globalAudio.currentTime = data.currentTime || 0; } catch(e){}
+        });
+
+        socket.on('audio:volume', (data) => {
+            globalAudio.volume = data.volume;
+            audioVolume.value = data.volume;
+            audioVolLabel.innerText = Math.round(data.volume * 100) + '%';
+        });
+
         // Controle dos Paineis da Toolbar
         function toggleToolPanel(panelId, btnElement) {
             const panel = document.getElementById(panelId);
@@ -688,13 +872,13 @@
         // UPLOAD POR DRAG & DROP DO PC E DA INTERNET + COLAR (CTRL+V)
         // ============================================
         function handleFileUpload(file, canvasX, canvasY) {
-            if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+            if (file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/')) {
                 const formData = new FormData();
                 formData.append('file', file);
 
-                const tooltip = document.querySelector('.tooltip');
-                const oldHtml = tooltip.innerHTML;
-                tooltip.innerHTML = "<b>Fazendo upload do arquivo...</b>";
+                const overlay = document.getElementById('upload-overlay');
+                document.getElementById('upload-text').innerText = "Fazendo upload...";
+                overlay.classList.add('show');
 
                 fetch('/upload', {
                     method: 'POST',
@@ -702,18 +886,27 @@
                 })
                 .then(res => res.json())
                 .then(data => {
-                    tooltip.innerHTML = oldHtml; // Restaura
+                    overlay.classList.remove('show');
                     if (data.url) {
-                        createMediaFromUrl(data.url, canvasX, canvasY);
+                        if (file.type.startsWith('audio/')) {
+                            loadAudioUploads();
+                            setTimeout(() => {
+                                audioSelect.value = data.url;
+                                customAudioGroup.style.display = 'none';
+                                toggleToolPanel('panel-audio', document.querySelector('.tool-btn[title="Áudio e Efeitos"]'));
+                            }, 500);
+                        } else {
+                            createMediaFromUrl(data.url, canvasX, canvasY);
+                        }
                     }
                 })
                 .catch(err => {
                     console.error('Erro no upload:', err);
-                    tooltip.innerHTML = oldHtml;
+                    overlay.classList.remove('show');
                     alert('Erro ao enviar o arquivo.');
                 });
             } else {
-                alert('Formato de arquivo não suportado. Envie Imagens ou Vídeos.');
+                alert('Formato de arquivo não suportado. Envie Imagens, Vídeos ou Áudios.');
             }
         }
 

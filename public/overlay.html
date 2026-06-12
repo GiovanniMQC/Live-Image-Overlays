@@ -29,11 +29,59 @@
         
         // Elementos atualmente no DOM
         const mediaElements = {};
+        let globalAudio = new Audio();
 
         // Ao conectar, pede o estado atual ao servidor para exibir o que já está na tela
         socket.on('connect', () => {
             console.log('Conectado ao servidor de Overlay');
             socket.emit('request_state');
+        });
+
+        function playAudioWithState(data) {
+            const playNow = () => {
+                try { globalAudio.currentTime = data.currentTime || 0; } catch(e){}
+                globalAudio.play().catch(e => console.error("Audio Error:", e));
+            };
+            
+            if (data.url) {
+                const fullUrl = new URL(data.url, window.location.origin).href;
+                if (globalAudio.src !== fullUrl) {
+                    globalAudio.src = data.url;
+                    globalAudio.onloadedmetadata = () => {
+                        globalAudio.onloadedmetadata = null;
+                        if (data.playing !== false) playNow();
+                    };
+                    return;
+                }
+            }
+            if (data.playing !== false) playNow();
+        }
+
+        socket.on('audio:sync', (data) => {
+            globalAudio.volume = data.volume;
+            if (data.playing) {
+                playAudioWithState(data);
+            } else {
+                if (data.url) {
+                    const fullUrl = new URL(data.url, window.location.origin).href;
+                    if (globalAudio.src !== fullUrl) globalAudio.src = data.url;
+                }
+                globalAudio.pause();
+                try { globalAudio.currentTime = data.currentTime || 0; } catch(e){}
+            }
+        });
+
+        socket.on('audio:play', (data) => {
+            playAudioWithState(data);
+        });
+
+        socket.on('audio:pause', (data) => {
+            globalAudio.pause();
+            try { globalAudio.currentTime = data.currentTime || 0; } catch(e){}
+        });
+
+        socket.on('audio:volume', (data) => {
+            globalAudio.volume = data.volume;
         });
 
         socket.on('sync_state', (stateList) => {
