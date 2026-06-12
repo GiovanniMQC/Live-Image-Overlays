@@ -649,6 +649,8 @@
         const canvasWrapper = document.getElementById('canvas-wrapper');
         const workspace = document.getElementById('workspace');
         const zoomLevelDisplay = document.getElementById('zoom-level');
+        const adminNameInput = document.getElementById('admin-name');
+        const adminColorInput = document.getElementById('admin-color');
         
         // Elementos do Audio Player
         const btnAudioStop = document.getElementById('btn-audio-stop');
@@ -671,6 +673,17 @@
         const btnCtxDelete = document.getElementById('btn-ctx-delete');
         const btnCtxMute = document.getElementById('btn-ctx-mute');
         const ctxVideoSeek = document.getElementById('ctx-video-seek');
+
+        // Carrega as preferências do usuário salvas no navegador
+        if (localStorage.getItem('adminName')) {
+            adminNameInput.value = localStorage.getItem('adminName');
+        }
+        if (localStorage.getItem('adminColor')) {
+            adminColorInput.value = localStorage.getItem('adminColor');
+        }
+        // Salva as preferências automaticamente ao digitar/alterar
+        adminNameInput.addEventListener('input', () => localStorage.setItem('adminName', adminNameInput.value));
+        adminColorInput.addEventListener('input', () => localStorage.setItem('adminColor', adminColorInput.value));
         
         let lastToolbarLeft, lastToolbarTop, lastHandleLeft, lastHandleTop, lastVideoSeek;
         
@@ -1912,8 +1925,8 @@
                 id: socket.id,
                 x: mouseX_inCanvasGlobal,
                 y: mouseY_inCanvasGlobal,
-                name: document.getElementById('admin-name').value,
-                color: document.getElementById('admin-color').value
+                name: adminNameInput.value,
+                color: adminColorInput.value
             });
 
             if (activeResizeElement && !isPanning) {
