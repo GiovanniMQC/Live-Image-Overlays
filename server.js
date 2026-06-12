@@ -298,6 +298,27 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('media:video_mute', (data) => {
+        if (appState[data.id]) {
+            appState[data.id].muted = data.muted;
+            socket.broadcast.emit('media:video_mute', data);
+        }
+    });
+
+    socket.on('media:video_seek', (data) => {
+        if (appState[data.id]) {
+            appState[data.id].currentTime = data.currentTime;
+            socket.broadcast.emit('media:video_seek', data);
+        }
+    });
+
+    socket.on('media:video_sync_from_overlay', (data) => {
+        if (appState[data.id]) {
+            appState[data.id].currentTime = data.currentTime;
+            socket.broadcast.emit('media:video_sync_from_overlay', data);
+        }
+    });
+
     socket.on('media:delete', (data) => {
         if (appState[data.id]) {
             const url = appState[data.id].url;

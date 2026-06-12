@@ -1635,6 +1635,45 @@
             }
         });
 
+        socket.on('media:video_mute', (data) => {
+            if (mediaState[data.id]) {
+                mediaState[data.id].muted = data.muted;
+                const el = document.getElementById(`admin-${data.id}`);
+                if (el) {
+                    const video = el.querySelector('video');
+                    const btnMute = el.querySelector('.btn-video-mute');
+                    if (video) video.muted = data.muted;
+                    if (btnMute) btnMute.innerText = data.muted ? '🔇 Mudo' : '🔊 Áudio';
+                }
+            }
+        });
+
+        socket.on('media:video_seek', (data) => {
+            if (mediaState[data.id]) {
+                mediaState[data.id].currentTime = data.currentTime;
+                const el = document.getElementById(`admin-${data.id}`);
+                if (el) {
+                    const video = el.querySelector('video');
+                    if (video) video.currentTime = data.currentTime;
+                }
+            }
+        });
+
+        socket.on('media:video_sync_from_overlay', (data) => {
+            if (mediaState[data.id]) {
+                mediaState[data.id].currentTime = data.currentTime;
+                const el = document.getElementById(`admin-${data.id}`);
+                if (el) {
+                    const video = el.querySelector('video');
+                    const seekInput = el.querySelector('input[type="range"]');
+                    // Se estiver fora de sincronia (navegador pausou) e o usuário não estiver arrastando a barra agora
+                    if (video && document.activeElement !== seekInput && Math.abs(video.currentTime - data.currentTime) > 1.5) {
+                        video.currentTime = data.currentTime;
+                    }
+                }
+            }
+        });
+
         // Lógica de Drag & Drop da Mídia
         let activeDragElement = null;
         let dragOffsetX = 0;
@@ -1840,8 +1879,53 @@
                     mediaEl.src = data.url;
                     mediaEl.autoplay = true;
                     mediaEl.loop = true;
-                    mediaEl.muted = true;
+                    mediaEl.muted = data.muted !== undefined ? data.muted : true;
+                    data.muted = mediaEl.muted;
                     mediaEl.classList.add('media-content');
+
+                    const btnMute = document.createElement('button');
+                    btnMute.className = 'btn-video-mute';
+                    btnMute.innerText = mediaEl.muted ? '🔇 Mudo' : '🔊 Áudio';
+                    btnMute.title = 'Alternar Áudio do Vídeo';
+                    btnMute.onclick = (e) => {
+                        e.stopPropagation();
+                        mediaEl.muted = !mediaEl.muted;
+                        data.muted = mediaEl.muted;
+                        btnMute.innerText = mediaEl.muted ? '🔇 Mudo' : '🔊 Áudio';
+                        socket.emit('media:video_mute', { id: data.id, muted: mediaEl.muted });
+                    };
+
+                    const seekInput = document.createElement('input');
+                    seekInput.type = 'range';
+                    seekInput.min = 0;
+                    seekInput.max = 100;
+                    seekInput.value = 0;
+                    seekInput.style.width = '80px';
+                    seekInput.style.cursor = 'pointer';
+                    seekInput.title = 'Tempo do Vídeo';
+                    seekInput.onmousedown = (e) => e.stopPropagation(); // Previne iniciar arrasto da imagem ao clicar na barra
+                    seekInput.oninput = (e) => {
+                        e.stopPropagation();
+                        if (mediaEl.duration) {
+                            const time = (seekInput.value / 100) * mediaEl.duration;
+                            mediaEl.currentTime = time;
+                            socket.emit('media:video_seek', { id: data.id, currentTime: time });
+                        }
+                    };
+
+                    mediaEl.addEventListener('timeupdate', () => {
+                        if (mediaEl.duration && document.activeElement !== seekInput) {
+                            seekInput.value = (mediaEl.currentTime / mediaEl.duration) * 100;
+                        }
+                    });
+
+                    controls.appendChild(btnMute);
+                    controls.appendChild(seekInput);
+
+                    // Aplica a posição de tempo correta caso exista nos dados
+                    if (data.currentTime) {
+                        mediaEl.currentTime = data.currentTime;
+                    }
                 } else {
                     mediaEl = document.createElement('img');
                     mediaEl.src = data.url;
@@ -1856,7 +1940,7 @@
 
             // Eventos do mouse para arrastar a imagem
             container.addEventListener('mousedown', (e) => {
-                if (e.target.tagName === 'BUTTON') return;
+                if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
                 
                 // Tira o foco de caixas de texto para permitir os atalhos de teclado funcionarem
                 if (document.activeElement && document.activeElement.tagName === 'INPUT') {

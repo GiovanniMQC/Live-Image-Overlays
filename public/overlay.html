@@ -19,10 +19,25 @@
             height: 1080px;
             position: relative;
         }
+
+        #interaction-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            font-size: 32px;
+            font-family: Arial, sans-serif;
+            z-index: 999999;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
-    
+    <div id="interaction-overlay">🔊 Clique aqui para permitir o áudio</div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
@@ -46,7 +61,13 @@
                         globalAudio.currentTime = data.currentTime || 0; 
                     }
                 } catch(e){}
-                globalAudio.play().catch(e => console.error("Audio Error:", e));
+                globalAudio.play().catch(e => {
+                    console.error("Audio Error:", e);
+                    // Se o navegador bloquear o autoplay, pede para o usuário clicar
+                    if (e.name === 'NotAllowedError') {
+                        document.getElementById('interaction-overlay').style.display = 'flex';
+                    }
+                });
             };
             
             if (data.url) {
@@ -69,6 +90,14 @@
                 });
             }
         }
+
+        // Ao clicar no overlay de bloqueio, tenta tocar novamente e o esconde
+        document.getElementById('interaction-overlay').addEventListener('click', () => {
+            document.getElementById('interaction-overlay').style.display = 'none';
+            if (globalAudio.src && globalAudio.src !== window.location.href) {
+                globalAudio.play().catch(e => console.error(e));
+            }
+        });
 
         socket.on('audio:sync', (data) => {
             if (data.volume !== undefined) globalAudio.volume = data.volume;
@@ -154,6 +183,22 @@
             }
         });
 
+        socket.on('media:video_mute', (data) => {
+            const el = mediaElements[data.id];
+            if (el) {
+                const video = el.querySelector('video');
+                if (video) video.muted = data.muted;
+            }
+        });
+
+        socket.on('media:video_seek', (data) => {
+            const el = mediaElements[data.id];
+            if (el) {
+                const video = el.querySelector('video');
+                if (video) video.currentTime = data.currentTime;
+            }
+        });
+
         socket.on('media:toggle_visibility', (data) => {
             const el = mediaElements[data.id];
             if (el) {
@@ -204,7 +249,10 @@
                     mediaEl.src = data.url;
                     mediaEl.autoplay = true;
                     mediaEl.loop = true;
-                    mediaEl.muted = true;
+                    mediaEl.muted = data.muted !== undefined ? data.muted : true;
+                    if (data.currentTime) {
+                        mediaEl.currentTime = data.currentTime;
+                    }
                 } else {
                     mediaEl = document.createElement('img');
                     mediaEl.src = data.url;
@@ -224,6 +272,18 @@
             
             mediaElements[data.id] = container;
         }
+
+        // Heartbeat: mantem o admin atualizado com o tempo real do vídeo rodando no OBS
+        setInterval(() => {
+            Object.keys(mediaElements).forEach(id => {
+                const el = mediaElements[id];
+                const video = el.querySelector('video');
+                if (video && !video.paused) {
+                    // Envia para o servidor sincronizar os painéis admin caso o navegador tenha pausado o vídeo lá
+                    socket.emit('media:video_sync_from_overlay', { id: id, currentTime: video.currentTime });
+                }
+            });
+        }, 2000);
     </script>
 </body>
 </html>
