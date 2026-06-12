@@ -1,0 +1,44 @@
+[
+  {
+    "id": "def-1",
+    "name": "Ta da!",
+    "icon": "🎉",
+    "url": "https://www.myinstants.com/media/sounds/tada.mp3",
+    "pinned": false
+  },
+  {
+    "id": "def-2",
+    "name": "Triste",
+    "icon": "🎺",
+    "url": "https://www.myinstants.com/media/sounds/sad-trombone.mp3",
+    "pinned": false
+  },
+  {
+    "id": "def-3",
+    "name": "Grilos",
+    "icon": "🦗",
+    "url": "https://www.myinstants.com/media/sounds/crickets.mp3",
+    "pinned": false
+  },
+  {
+    "id": "def-4",
+    "name": "Errou",
+    "icon": "❌",
+    "url": "https://www.myinstants.com/media/sounds/errooou.mp3",
+    "pinned": false
+  },
+  {
+    "id": "def-5",
+    "name": "Vine Boom",
+    "icon": "💥",
+    "url": "https://www.myinstants.com/media/sounds/vine-boom.mp3",
+    "pinned": false
+  },
+  {
+    "id": "up-1780756024153aonj6y3",
+    "name": "Mario Paint",
+    "icon": "🎵",
+    "url": "/audio_uploads/audio-1780756024137-51340171.mp3",
+    "pinned": false
+  }
+]

@@ -38,36 +38,54 @@
         });
 
         function playAudioWithState(data) {
+            if (data.volume !== undefined) globalAudio.volume = data.volume;
+
             const playNow = () => {
-                try { globalAudio.currentTime = data.currentTime || 0; } catch(e){}
+                try { 
+                    if (Math.abs(globalAudio.currentTime - (data.currentTime || 0)) > 0.5) {
+                        globalAudio.currentTime = data.currentTime || 0; 
+                    }
+                } catch(e){}
                 globalAudio.play().catch(e => console.error("Audio Error:", e));
             };
             
             if (data.url) {
                 const fullUrl = new URL(data.url, window.location.origin).href;
                 if (globalAudio.src !== fullUrl) {
+                    globalAudio.pause();
                     globalAudio.src = data.url;
-                    globalAudio.onloadedmetadata = () => {
-                        globalAudio.onloadedmetadata = null;
-                        if (data.playing !== false) playNow();
-                    };
-                    return;
+                    globalAudio.load();
                 }
             }
-            if (data.playing !== false) playNow();
+
+            if (!globalAudio.src || globalAudio.src === window.location.href) return;
+
+            if (globalAudio.readyState >= 1) { // HAVE_METADATA
+                if (data.playing !== false) playNow();
+            } else {
+                globalAudio.addEventListener('loadedmetadata', function onLoaded() {
+                    globalAudio.removeEventListener('loadedmetadata', onLoaded);
+                    if (data.playing !== false) playNow();
+                });
+            }
         }
 
         socket.on('audio:sync', (data) => {
-            globalAudio.volume = data.volume;
+            if (data.volume !== undefined) globalAudio.volume = data.volume;
             if (data.playing) {
                 playAudioWithState(data);
             } else {
                 if (data.url) {
                     const fullUrl = new URL(data.url, window.location.origin).href;
-                    if (globalAudio.src !== fullUrl) globalAudio.src = data.url;
+                    if (globalAudio.src !== fullUrl) {
+                        globalAudio.src = data.url;
+                        globalAudio.load();
+                    }
                 }
                 globalAudio.pause();
-                try { globalAudio.currentTime = data.currentTime || 0; } catch(e){}
+                if (globalAudio.readyState >= 1) {
+                    try { globalAudio.currentTime = data.currentTime || 0; } catch(e){}
+                }
             }
         });
 
@@ -78,6 +96,10 @@
         socket.on('audio:pause', (data) => {
             globalAudio.pause();
             try { globalAudio.currentTime = data.currentTime || 0; } catch(e){}
+        });
+
+        socket.on('audio:seek', (data) => {
+            try { globalAudio.currentTime = data.currentTime; } catch(e){}
         });
 
         socket.on('audio:volume', (data) => {

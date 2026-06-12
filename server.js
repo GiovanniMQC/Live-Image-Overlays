@@ -21,6 +21,12 @@ if (!fs.existsSync(uploadsDir)) {
     }
 }
 
+// Configuração da pasta de Uploads de Áudio (persistente)
+const audioUploadsDir = path.join(__dirname, 'public', 'audio_uploads');
+if (!fs.existsSync(audioUploadsDir)) {
+    fs.mkdirSync(audioUploadsDir, { recursive: true });
+}
+
 // Configuração do Multer para salvar os arquivos
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -34,6 +40,19 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
+// Configuração do Multer para os áudios
+const audioStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, audioUploadsDir)
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+        const ext = path.extname(file.originalname);
+        cb(null, 'audio-' + uniqueSuffix + ext)
+    }
+});
+const uploadAudio = multer({ storage: audioStorage });
+
 // Endpoint para receber arquivos via Drag & Drop
 app.post('/upload', upload.single('file'), (req, res) => {
     if (!req.file) {
@@ -43,14 +62,152 @@ app.post('/upload', upload.single('file'), (req, res) => {
     res.json({ url: '/uploads/' + req.file.filename });
 });
 
-// Endpoint para listar os áudios upados
-app.get('/api/audio-uploads', (req, res) => {
+// Novo endpoint para receber arquivos de áudio
+app.post('/upload-audio', uploadAudio.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+    }
+    // Retorna a URL pública do arquivo
+    res.json({ url: '/audio_uploads/' + req.file.filename });
+});
+
+app.use(express.json()); // Necessário para ler o body das requisições POST com JSON
+
+const audioDbPath = path.join(__dirname, 'audio_db.json');
+let audioList = [];
+const defaultSounds = [
+    { id: 'def-1', name: "Ta Da!", icon: "🎉", url: "https://www.myinstants.com/media/sounds/tada.mp3", pinned: false },
+    { id: 'def-2', name: "Triste", icon: "🎺", url: "https://www.myinstants.com/media/sounds/sad-trombone.mp3", pinned: false },
+    { id: 'def-3', name: "Grilos", icon: "🦗", url: "https://www.myinstants.com/media/sounds/crickets.mp3", pinned: false },
+    { id: 'def-4', name: "Errou", icon: "❌", url: "https://www.myinstants.com/media/sounds/errooou.mp3", pinned: false },
+    { id: 'def-5', name: "Vine Boom", icon: "💥", url: "https://www.myinstants.com/media/sounds/vine-boom.mp3", pinned: false }
+];
+
+function loadAudioDb() {
+    if (fs.existsSync(audioDbPath)) {
+        try {
+            audioList = JSON.parse(fs.readFileSync(audioDbPath, 'utf8'));
+        } catch(e) {
+            audioList = [...defaultSounds];
+        }
+    } else {
+        audioList = [...defaultSounds];
+        saveAudioDb();
+    }
+}
+
+function saveAudioDb() {
+    fs.writeFileSync(audioDbPath, JSON.stringify(audioList, null, 2));
+}
+
+loadAudioDb();
+
+// Endpoint para listar os áudios e sincronizar com uploads físicos
+app.get('/api/audio-list', (req, res) => {
     try {
-        const files = fs.readdirSync(uploadsDir);
+        const files = fs.readdirSync(audioUploadsDir);
         const audioFiles = files.filter(f => f.match(/\.(mp3|wav|ogg|aac|m4a)$/i));
-        res.json(audioFiles.map(f => '/uploads/' + f));
+        const fileUrls = audioFiles.map(f => '/audio_uploads/' + f);
+        
+        // Adiciona novos arquivos à lista se não existirem
+        fileUrls.forEach(url => {
+            if (!audioList.find(a => a.url === url)) {
+                const filename = url.split('/').pop();
+                const shortName = filename.length > 15 ? filename.substring(0, 12) + '...' : filename;
+                audioList.push({
+                    id: 'up-' + Date.now() + Math.random().toString(36).substring(2,9),
+                    name: shortName,
+                    icon: "🎵",
+                    url: url,
+                    pinned: false
+                });
+            }
+        });
+
+        // Remover da audioList os arquivos de upload que não existem mais fisicamente
+        audioList = audioList.filter(a => {
+            if (a.url.startsWith('/audio_uploads/')) {
+                return fileUrls.includes(a.url);
+            }
+            if (a.url.startsWith('/uploads/')) {
+                return false; // Remove áudios antigos temporários caso tenham sobrado do sistema antigo
+            }
+            return true; // mantém URLs externas
+        });
+
+        saveAudioDb();
     } catch(e) {
-        res.json([]);
+        console.error("Erro ao sincronizar uploads de áudio:", e);
+    }
+    
+    // Sort logic: pinned first, then preserve existing order
+    const pinned = audioList.filter(a => a.pinned);
+    const unpinned = audioList.filter(a => !a.pinned);
+    res.json([...pinned, ...unpinned]);
+});
+
+// Atualizar propriedades de um áudio
+app.post('/api/audio-update/:id', (req, res) => {
+    const id = req.params.id;
+    const { name, icon, pinned } = req.body;
+    
+    const audio = audioList.find(a => a.id === id);
+    if (audio) {
+        if (name !== undefined) audio.name = name;
+        if (icon !== undefined) audio.icon = icon;
+        if (pinned !== undefined) audio.pinned = pinned;
+        saveAudioDb();
+        res.json({ success: true, audio });
+    } else {
+        res.status(404).json({ error: 'Áudio não encontrado' });
+    }
+});
+
+// Excluir um áudio
+app.post('/api/audio-delete/:id', (req, res) => {
+    const id = req.params.id;
+    const audioIndex = audioList.findIndex(a => a.id === id);
+    
+    if (audioIndex !== -1) {
+        const audio = audioList[audioIndex];
+        audioList.splice(audioIndex, 1);
+        
+        // Se for um arquivo local de upload, apaga do disco permanentemente
+        if (audio.url.startsWith('/audio_uploads/')) {
+            const filename = path.basename(audio.url);
+            const filepath = path.join(audioUploadsDir, filename);
+            try { if (fs.existsSync(filepath)) fs.unlinkSync(filepath); } catch(e) {}
+        }
+        
+        saveAudioDb();
+        res.json({ success: true });
+    } else {
+        res.status(404).json({ error: 'Áudio não encontrado' });
+    }
+});
+
+// Reordenar a lista
+app.post('/api/audio-reorder', (req, res) => {
+    const { orderIds } = req.body; // array de IDs na nova ordem
+    if (Array.isArray(orderIds)) {
+        const newList = [];
+        orderIds.forEach(id => {
+            const audio = audioList.find(a => a.id === id);
+            if (audio) newList.push(audio);
+        });
+        
+        // Se ficou faltando algum, adiciona no final
+        audioList.forEach(audio => {
+            if (!newList.find(a => a.id === audio.id)) {
+                newList.push(audio);
+            }
+        });
+        
+        audioList = newList;
+        saveAudioDb();
+        res.json({ success: true });
+    } else {
+        res.status(400).json({ error: 'Formato de orderIds inválido' });
     }
 });
 
