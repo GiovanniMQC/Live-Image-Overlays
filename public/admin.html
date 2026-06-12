@@ -691,6 +691,23 @@
         const btnCtxMute = document.getElementById('btn-ctx-mute');
         const ctxVideoSeek = document.getElementById('ctx-video-seek');
         const ctxOpacity = document.getElementById('ctx-opacity');
+        
+        // Novos botões
+        const btnCtxFlipH = document.createElement('button');
+        btnCtxFlipH.title = "Espelhar Horizontal";
+        btnCtxFlipH.innerText = "↔️";
+        
+        const btnCtxFlipV = document.createElement('button');
+        btnCtxFlipV.title = "Espelhar Vertical";
+        btnCtxFlipV.innerText = "↕️";
+
+        const btnCtxRotate = document.createElement('button');
+        btnCtxRotate.title = "Rotacionar 90º";
+        btnCtxRotate.innerText = "🔄";
+
+        selectionToolbar.insertBefore(btnCtxRotate, btnCtxDelete);
+        selectionToolbar.insertBefore(btnCtxFlipH, btnCtxRotate);
+        selectionToolbar.insertBefore(btnCtxFlipV, btnCtxRotate);
 
         // Carrega as preferências do usuário salvas no navegador
         if (localStorage.getItem('adminName')) {
@@ -705,6 +722,29 @@
         
         let lastToolbarLeft, lastToolbarTop, lastHandleLeft, lastHandleTop, lastVideoSeek;
         
+        function applyTransform(id) {
+            const media = mediaState[id];
+            const container = document.getElementById(`admin-${id}`);
+            if (!container) return;
+            
+            const sx = media.scaleX !== undefined ? media.scaleX : (media.scale || 1);
+            const sy = media.scaleY !== undefined ? media.scaleY : (media.scale || 1);
+            const rot = media.rotation || 0;
+            
+            container.style.transform = `rotate(${rot}deg) scale(${sx}, ${sy})`;
+            
+            const contentEl = container.querySelector('.media-content');
+            if (contentEl) {
+                const flipX = media.flipX ? -1 : 1;
+                const flipY = media.flipY ? -1 : 1;
+                contentEl.style.transform = `scale(${flipX}, ${flipY})`;
+                
+                const crop = media.crop || { t: 0, r: 0, b: 0, l: 0 };
+                contentEl.style.clipPath = `inset(${crop.t}px ${crop.r}px ${crop.b}px ${crop.l}px)`;
+            }
+            updateSelectionUI();
+        }
+
         function updateSelectionUI() {
             if (!selectedElementId) {
                 if (selectionToolbar.classList.contains('show')) {
@@ -720,6 +760,8 @@
 
             const sx = media.scaleX !== undefined ? media.scaleX : (media.scale || 1);
             const sy = media.scaleY !== undefined ? media.scaleY : (media.scale || 1);
+            const rot = media.rotation || 0;
+            const rad = rot * Math.PI / 180;
 
             const contentEl = el.querySelector('.media-content');
             if (!contentEl) return;
@@ -727,22 +769,52 @@
             const baseWidth = contentEl.offsetWidth || 1;
             const baseHeight = contentEl.offsetHeight || 1;
 
-            const realWidth = baseWidth * sx * currentScale;
-            const realHeight = baseHeight * sy * currentScale;
+            const crop = media.crop || { t: 0, r: 0, b: 0, l: 0 };
+            const visibleWidth = Math.max(1, baseWidth - crop.l - crop.r);
+            const visibleHeight = Math.max(1, baseHeight - crop.t - crop.b);
 
             const leftPos = (media.x + canvasPadding) * currentScale;
             const topPos = (media.y + canvasPadding) * currentScale;
 
-            if (lastToolbarLeft !== leftPos || lastToolbarTop !== topPos) {
-                selectionToolbar.style.left = leftPos + 'px';
-                selectionToolbar.style.top = (topPos - 15) + 'px';
-                lastToolbarLeft = leftPos;
-                lastToolbarTop = topPos;
+            const corners = [
+                {x: crop.l, y: crop.t},
+                {x: crop.l + visibleWidth, y: crop.t},
+                {x: crop.l + visibleWidth, y: crop.t + visibleHeight},
+                {x: crop.l, y: crop.t + visibleHeight}
+            ];
+            
+            let minX = Infinity, minY = Infinity;
+            corners.forEach(c => {
+                const sx_c = c.x * sx;
+                const sy_c = c.y * sy;
+                const rx = sx_c * Math.cos(rad) - sy_c * Math.sin(rad);
+                const ry = sx_c * Math.sin(rad) + sy_c * Math.cos(rad);
+                if (rx < minX) minX = rx;
+                if (ry < minY) minY = ry;
+            });
+
+            const selectionLeft = leftPos + minX * currentScale;
+            const selectionTop = topPos + minY * currentScale;
+
+            if (lastToolbarLeft !== selectionLeft || lastToolbarTop !== selectionTop) {
+                selectionToolbar.style.left = selectionLeft + 'px';
+                selectionToolbar.style.top = (selectionTop - 15) + 'px';
+                lastToolbarLeft = selectionLeft;
+                lastToolbarTop = selectionTop;
             }
             if (!selectionToolbar.classList.contains('show')) selectionToolbar.classList.add('show');
 
-            const handleLeft = leftPos + realWidth;
-            const handleTop = topPos + realHeight;
+            // Handle is at the bottom right of the VISIBLE area.
+            const unscaledCornerX = crop.l + visibleWidth;
+            const unscaledCornerY = crop.t + visibleHeight;
+            const scaledCornerX = unscaledCornerX * sx;
+            const scaledCornerY = unscaledCornerY * sy;
+            const hrx = scaledCornerX * Math.cos(rad) - scaledCornerY * Math.sin(rad);
+            const hry = scaledCornerX * Math.sin(rad) + scaledCornerY * Math.cos(rad);
+
+            const handleLeft = leftPos + hrx * currentScale;
+            const handleTop = topPos + hry * currentScale;
+
             if (lastHandleLeft !== handleLeft || lastHandleTop !== handleTop) {
                 globalResizeHandle.style.left = handleLeft + 'px';
                 globalResizeHandle.style.top = handleTop + 'px';
@@ -1723,10 +1795,23 @@
             if (mediaState[data.id]) {
                 mediaState[data.id].scaleX = data.scaleX;
                 mediaState[data.id].scaleY = data.scaleY;
-                const el = document.getElementById(`admin-${data.id}`);
-                if (el) {
-                    el.style.transform = `scale(${data.scaleX}, ${data.scaleY})`;
-                }
+                applyTransform(data.id);
+            }
+        });
+
+        socket.on('media:transform_sync', (data) => {
+            if (mediaState[data.id]) {
+                mediaState[data.id].rotation = data.rotation;
+                mediaState[data.id].flipX = data.flipX;
+                mediaState[data.id].flipY = data.flipY;
+                applyTransform(data.id);
+            }
+        });
+
+        socket.on('media:crop_sync', (data) => {
+            if (mediaState[data.id]) {
+                mediaState[data.id].crop = data.crop;
+                applyTransform(data.id);
             }
         });
 
@@ -2006,6 +2091,33 @@
                 const canvasDx = dx / currentScale;
                 const canvasDy = dy / currentScale;
 
+                if (activeResizeElement.isAltKey) {
+                    const rot = mediaState[activeResizeElement.id].rotation || 0;
+                    const rad = -rot * Math.PI / 180;
+                    
+                    const unrotatedDx = canvasDx * Math.cos(rad) - canvasDy * Math.sin(rad);
+                    const unrotatedDy = canvasDx * Math.sin(rad) + canvasDy * Math.cos(rad);
+                    
+                    const unscaledDx = unrotatedDx / resizeStartScaleX;
+                    const unscaledDy = unrotatedDy / resizeStartScaleY;
+
+                    let newCropR = resizeStartCropR - unscaledDx;
+                    let newCropB = resizeStartCropB - unscaledDy;
+
+                    newCropR = Math.max(0, Math.min(newCropR, resizeBaseWidth - resizeStartCropL - 10)); 
+                    newCropB = Math.max(0, Math.min(newCropB, resizeBaseHeight - resizeStartCropT - 10));
+
+                    if (!mediaState[activeResizeElement.id].crop) {
+                        mediaState[activeResizeElement.id].crop = { t: 0, r: 0, b: 0, l: 0 };
+                    }
+                    mediaState[activeResizeElement.id].crop.r = newCropR;
+                    mediaState[activeResizeElement.id].crop.b = newCropB;
+
+                    applyTransform(activeResizeElement.id);
+                    socket.emit('media:crop_sync', { id: activeResizeElement.id, crop: mediaState[activeResizeElement.id].crop });
+                    return;
+                }
+
                 let newSx = resizeStartScaleX + (canvasDx / resizeBaseWidth);
                 let newSy = resizeStartScaleY + (canvasDy / resizeBaseHeight);
 
@@ -2132,6 +2244,34 @@
             socket.emit('media:toggle_visibility', { id: id, visible: media.visible });
         });
 
+        btnCtxRotate.addEventListener('click', () => {
+            if (!selectedElementId) return;
+            const id = selectedElementId;
+            if (!mediaState[id]) return;
+            mediaState[id].rotation = (mediaState[id].rotation || 0) + 90;
+            if (mediaState[id].rotation >= 360) mediaState[id].rotation = 0;
+            applyTransform(id);
+            socket.emit('media:transform_sync', { id: id, rotation: mediaState[id].rotation, flipX: mediaState[id].flipX, flipY: mediaState[id].flipY });
+        });
+
+        btnCtxFlipH.addEventListener('click', () => {
+            if (!selectedElementId) return;
+            const id = selectedElementId;
+            if (!mediaState[id]) return;
+            mediaState[id].flipX = !mediaState[id].flipX;
+            applyTransform(id);
+            socket.emit('media:transform_sync', { id: id, rotation: mediaState[id].rotation, flipX: mediaState[id].flipX, flipY: mediaState[id].flipY });
+        });
+
+        btnCtxFlipV.addEventListener('click', () => {
+            if (!selectedElementId) return;
+            const id = selectedElementId;
+            if (!mediaState[id]) return;
+            mediaState[id].flipY = !mediaState[id].flipY;
+            applyTransform(id);
+            socket.emit('media:transform_sync', { id: id, rotation: mediaState[id].rotation, flipX: mediaState[id].flipX, flipY: mediaState[id].flipY });
+        });
+
         btnCtxDelete.addEventListener('click', () => {
             if (!selectedElementId) return;
             const id = selectedElementId;
@@ -2183,6 +2323,11 @@
             socket.emit('media:opacity_sync', { id: id, opacity: val });
         });
 
+        let resizeStartCropT = 0;
+        let resizeStartCropR = 0;
+        let resizeStartCropB = 0;
+        let resizeStartCropL = 0;
+
         globalResizeHandle.addEventListener('mousedown', (e) => {
             if (!selectedElementId) return;
             e.stopPropagation();
@@ -2191,7 +2336,7 @@
             const id = selectedElementId;
             const container = document.getElementById(`admin-${id}`);
 
-            activeResizeElement = { element: container, id: id };
+            activeResizeElement = { element: container, id: id, isAltKey: e.altKey };
 
             resizeStartMouseX = e.clientX;
             resizeStartMouseY = e.clientY;
@@ -2199,6 +2344,13 @@
             resizeStartScaleX = mediaState[id].scaleX !== undefined ? mediaState[id].scaleX : (mediaState[id].scale || 1);
             resizeStartScaleY = mediaState[id].scaleY !== undefined ? mediaState[id].scaleY : (mediaState[id].scale || 1);
             
+            const crop = mediaState[id].crop || { t: 0, r: 0, b: 0, l: 0 };
+            mediaState[id].crop = crop;
+            resizeStartCropT = crop.t;
+            resizeStartCropR = crop.r;
+            resizeStartCropB = crop.b;
+            resizeStartCropL = crop.l;
+
             const contentEl = container.querySelector('.media-content');
             resizeBaseWidth = contentEl ? contentEl.offsetWidth : 100;
             resizeBaseHeight = contentEl ? contentEl.offsetHeight : 100;

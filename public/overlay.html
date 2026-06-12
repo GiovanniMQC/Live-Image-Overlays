@@ -156,13 +156,26 @@
         });
 
         socket.on('media:scale_sync', (data) => {
-            const el = mediaElements[data.id];
-            if (el) {
-                const sx = data.scaleX !== undefined ? data.scaleX : (data.scale || 1);
-                const sy = data.scaleY !== undefined ? data.scaleY : (data.scale || 1);
-                el.style.transform = `scale(${sx}, ${sy})`;
-                // Definir a origem do transform para top left faz com que o redimensionamento a partir do x, y seja previsível
-                el.style.transformOrigin = 'top left'; 
+            if (mediaState[data.id]) {
+                mediaState[data.id].scaleX = data.scaleX !== undefined ? data.scaleX : (data.scale || 1);
+                mediaState[data.id].scaleY = data.scaleY !== undefined ? data.scaleY : (data.scale || 1);
+                applyTransform(data.id);
+            }
+        });
+
+        socket.on('media:transform_sync', (data) => {
+            if (mediaState[data.id]) {
+                mediaState[data.id].rotation = data.rotation;
+                mediaState[data.id].flipX = data.flipX;
+                mediaState[data.id].flipY = data.flipY;
+                applyTransform(data.id);
+            }
+        });
+
+        socket.on('media:crop_sync', (data) => {
+            if (mediaState[data.id]) {
+                mediaState[data.id].crop = data.crop;
+                applyTransform(data.id);
             }
         });
 
@@ -222,7 +235,11 @@
         });
 
         function createOrUpdateMedia(data) {
-            if (mediaElements[data.id]) return;
+            mediaState[data.id] = { ...mediaState[data.id], ...data };
+            if (mediaElements[data.id]) {
+                applyTransform(data.id);
+                return;
+            }
 
             // Cria um container (wrapper) idêntico ao que existe no Admin
             const container = document.createElement('div');
@@ -234,10 +251,6 @@
             container.style.transformOrigin = 'top left';
             container.style.zIndex = data.zIndex !== undefined ? data.zIndex : 10;
             
-            const sx = data.scaleX !== undefined ? data.scaleX : (data.scale || 1);
-            const sy = data.scaleY !== undefined ? data.scaleY : (data.scale || 1);
-            container.style.transform = `scale(${sx}, ${sy})`;
-
             let mediaEl;
             if (data.type === 'text') {
                 mediaEl = document.createElement('div');
@@ -282,6 +295,7 @@
             document.body.appendChild(container);
             
             mediaElements[data.id] = container;
+            applyTransform(data.id);
         }
 
         // Heartbeat: mantem o admin atualizado com o tempo real do vídeo rodando no OBS

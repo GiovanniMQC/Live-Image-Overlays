@@ -279,6 +279,22 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('media:transform_sync', (data) => {
+        if (appState[data.id]) {
+            appState[data.id].rotation = data.rotation;
+            appState[data.id].flipX = data.flipX;
+            appState[data.id].flipY = data.flipY;
+            socket.broadcast.emit('media:transform_sync', data);
+        }
+    });
+
+    socket.on('media:crop_sync', (data) => {
+        if (appState[data.id]) {
+            appState[data.id].crop = data.crop;
+            socket.broadcast.emit('media:crop_sync', data);
+        }
+    });
+
     socket.on('media:update_text', (data) => {
         if (appState[data.id]) {
             appState[data.id].text = data.text;
