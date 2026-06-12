@@ -1288,21 +1288,22 @@
             .catch(e => console.error(e));
         }
 
+        let previewAudioInstance = null;
         function createSoundButton(audio) {
             const container = document.createElement('div');
             container.className = 'sound-btn-container';
             container.draggable = true;
             container.dataset.id = audio.id;
-            
+
             const btn = document.createElement('button');
             btn.className = 'sound-btn';
             if (audio.pinned) btn.style.borderColor = 'gold';
-            
+
             btn.innerHTML = `<span class="sound-icon">${audio.icon || '🎵'}</span><span>${audio.name}</span>`;
             btn.onclick = () => {
                 socket.emit('audio:play', { url: audio.url, currentTime: 0 });
             };
-            
+
             const editBtn = document.createElement('button');
             editBtn.className = 'btn-edit-audio';
             editBtn.innerHTML = '✏️';
@@ -1320,6 +1321,44 @@
             pinBtn.onclick = (e) => {
                 e.stopPropagation();
                 togglePinAudio(audio.id);
+            };
+
+            const previewBtn = document.createElement('button');
+            previewBtn.className = 'btn-edit-audio preview-toggle-btn';
+            previewBtn.innerHTML = '🎧';
+            previewBtn.title = 'Preview (Ouvir localmente)';
+            previewBtn.style.right = 'auto';
+            previewBtn.style.left = '5px';
+            previewBtn.onclick = (e) => {
+                e.stopPropagation();
+                
+                if (previewAudioInstance && previewBtn.innerHTML === '⏹️') {
+                    previewAudioInstance.pause();
+                    previewBtn.innerHTML = '🎧';
+                    previewBtn.title = 'Preview (Ouvir localmente)';
+                    return;
+                }
+
+                if (previewAudioInstance) {
+                    previewAudioInstance.pause();
+                    document.querySelectorAll('.preview-toggle-btn').forEach(btn => {
+                        btn.innerHTML = '🎧';
+                        btn.title = 'Preview (Ouvir localmente)';
+                    });
+                }
+                
+                previewBtn.innerHTML = '⏹️';
+                previewBtn.title = 'Parar Preview';
+
+                previewAudioInstance = new Audio(audio.url);
+                previewAudioInstance.volume = parseFloat(document.getElementById('audio-volume').value) || 0.5;
+                
+                previewAudioInstance.onended = () => {
+                    previewBtn.innerHTML = '🎧';
+                    previewBtn.title = 'Preview (Ouvir localmente)';
+                };
+
+                previewAudioInstance.play().catch(err => console.error(err));
             };
 
             const delBtn = document.createElement('button');
@@ -1342,6 +1381,7 @@
             container.appendChild(btn);
             container.appendChild(editBtn);
             container.appendChild(pinBtn);
+            container.appendChild(previewBtn);
             container.appendChild(delBtn);
 
             container.addEventListener('dragstart', handleDragStart);
@@ -1490,6 +1530,13 @@
 
         function playAudioWithState(data) {
             if (data.volume !== undefined) globalAudio.volume = data.volume;
+
+            const btnWebrtc = document.getElementById('btn-webrtc');
+            if (btnWebrtc && btnWebrtc.classList.contains('active')) {
+                globalAudio.muted = true;
+            } else {
+                globalAudio.muted = false;
+            }
 
             const playNow = () => {
                 try { 
@@ -3127,7 +3174,9 @@
                 btnWebrtc.title = 'Desconectar Retorno de Vídeo';
                 // Preparado para receber chamadas. Apenas ligar o áudio do elemento de video caso bloqueado
                 remoteVideo.play().catch(e => console.log('Aguardando fluxo de video', e));
-                
+
+                if (typeof globalAudio !== 'undefined') globalAudio.muted = true;
+
                 // Pede pro emissor mandar a oferta, caso ele já esteja transmitindo
                 socket.emit('request_webrtc_offer');
             } else {
@@ -3135,6 +3184,9 @@
                 btnWebrtc.style.borderColor = '#218838';
                 btnWebrtc.innerText = '📡';
                 btnWebrtc.title = 'Conectar Retorno de Vídeo';
+
+                if (typeof globalAudio !== 'undefined') globalAudio.muted = false;
+
                 if (webrtcPeerConnection) {
                     webrtcPeerConnection.close();
                     webrtcPeerConnection = null;
