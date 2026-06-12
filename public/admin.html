@@ -582,6 +582,7 @@
             <button id="btn-ctx-hide" title="Ocultar/Mostrar">👁️ Ocultar</button>
             <button id="btn-ctx-mute" class="video-only" title="Mudo/Áudio">🔊 Áudio</button>
             <input type="range" id="ctx-video-seek" class="video-only" min="0" max="100" value="0">
+            <input type="range" id="ctx-opacity" min="0" max="1" step="0.01" value="1" title="Opacidade (Transparência)" style="width: 80px; cursor: pointer;">
             <button id="btn-ctx-delete" class="danger" title="Excluir">🗑️ Excluir</button>
         </div>
         <div id="global-resize-handle"></div>
@@ -689,6 +690,7 @@
         const btnCtxDelete = document.getElementById('btn-ctx-delete');
         const btnCtxMute = document.getElementById('btn-ctx-mute');
         const ctxVideoSeek = document.getElementById('ctx-video-seek');
+        const ctxOpacity = document.getElementById('ctx-opacity');
 
         // Carrega as preferências do usuário salvas no navegador
         if (localStorage.getItem('adminName')) {
@@ -1294,6 +1296,7 @@
                     btnCtxMute.style.display = 'none';
                     ctxVideoSeek.style.display = 'none';
                 }
+                ctxOpacity.value = media.opacity !== undefined ? media.opacity : 1;
             }
             updateSelectionUI();
         }
@@ -1816,6 +1819,20 @@
             }
         });
 
+        socket.on('media:opacity_sync', (data) => {
+            if (mediaState[data.id]) {
+                mediaState[data.id].opacity = data.opacity;
+                const el = document.getElementById(`admin-${data.id}`);
+                if (el) {
+                    const contentEl = el.querySelector('.media-content');
+                    if (contentEl) contentEl.style.opacity = data.opacity;
+                }
+                if (selectedElementId === data.id && ctxOpacity) {
+                    ctxOpacity.value = data.opacity;
+                }
+            }
+        });
+
         // Lógica de Drag & Drop da Mídia
         let activeDragElement = null;
         let dragOffsetX = 0;
@@ -1918,6 +1935,10 @@
                     mediaEl.draggable = false;
                     mediaEl.classList.add('media-content');
                 }
+            }
+
+            if (data.opacity !== undefined) {
+                mediaEl.style.opacity = data.opacity;
             }
 
             container.appendChild(mediaEl);
@@ -2145,6 +2166,21 @@
                 video.currentTime = time;
                 socket.emit('media:video_seek', { id: id, currentTime: time });
             }
+        });
+
+        ctxOpacity.addEventListener('input', () => {
+            if (!selectedElementId) return;
+            const id = selectedElementId;
+            const val = parseFloat(ctxOpacity.value);
+            if (mediaState[id]) {
+                mediaState[id].opacity = val;
+            }
+            const container = document.getElementById(`admin-${id}`);
+            if (container) {
+                const contentEl = container.querySelector('.media-content');
+                if (contentEl) contentEl.style.opacity = val;
+            }
+            socket.emit('media:opacity_sync', { id: id, opacity: val });
         });
 
         globalResizeHandle.addEventListener('mousedown', (e) => {

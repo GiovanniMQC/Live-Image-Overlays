@@ -293,6 +293,13 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('media:opacity_sync', (data) => {
+        if (appState[data.id]) {
+            appState[data.id].opacity = data.opacity;
+            socket.broadcast.emit('media:opacity_sync', data);
+        }
+    });
+
     socket.on('media:toggle_visibility', (data) => {
         if (appState[data.id]) {
             appState[data.id].visible = data.visible;
@@ -391,12 +398,24 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`\n======================================================`);
-    console.log(`🚀 Servidor rodando na porta ${PORT}`);
-    console.log(`======================================================`);
-    console.log(`📺 OBS Overlay URL: http://localhost:${PORT}/overlay.html`);
-    console.log(`🛠️  Painel Admin URL: http://localhost:${PORT}/admin.html`);
-    console.log(`======================================================\n`);
-});
+const initialPort = process.env.PORT || 3000;
+
+function startServer(port) {
+    server.listen(port, () => {
+        console.log(`\n======================================================`);
+        console.log(`🚀 Servidor rodando na porta ${port}`);
+        console.log(`======================================================`);
+        console.log(`📺 OBS Overlay URL: http://localhost:${port}/overlay.html`);
+        console.log(`🛠️  Painel Admin URL: http://localhost:${port}/admin.html`);
+        console.log(`======================================================\n`);
+    }).on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.log(`⚠️ A porta ${port} está em uso. Tentando a porta ${port + 1}...`);
+            startServer(port + 1);
+        } else {
+            console.error('Erro ao iniciar o servidor:', err);
+        }
+    });
+}
+
+startServer(initialPort);

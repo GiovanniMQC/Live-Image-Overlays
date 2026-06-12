@@ -199,6 +199,13 @@
             }
         });
 
+        socket.on('media:opacity_sync', (data) => {
+            const el = mediaElements[data.id];
+            if (el && el.firstChild) {
+                el.firstChild.style.opacity = data.opacity;
+            }
+        });
+
         socket.on('media:toggle_visibility', (data) => {
             const el = mediaElements[data.id];
             if (el) {
@@ -266,6 +273,10 @@
 
             mediaEl.style.pointerEvents = 'none';
             mediaEl.style.userSelect = 'none';
+
+            if (data.opacity !== undefined) {
+                mediaEl.style.opacity = data.opacity;
+            }
 
             container.appendChild(mediaEl);
             document.body.appendChild(container);
