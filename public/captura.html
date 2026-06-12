@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Captura - WebRTC Emissor</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        video {
+            width: 80%;
+            max-width: 800px;
+            background: #000;
+            border: 2px solid #333;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <h1>Transmissão WebRTC</h1>
+    <video id="localVideo" autoplay muted></video>
+    <button id="btnStart">Iniciar Transmissão</button>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const localVideo = document.getElementById('localVideo');
+        const btnStart = document.getElementById('btnStart');
+
+        let peerConnections = {}; // socket.id -> RTCPeerConnection
+        let iceCandidateQueues = {}; // socket.id -> Array of candidates
+        let localStream = null;
+
+        const config = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' }
+            ]
+        };
+
+        btnStart.addEventListener('click', async () => {
+            btnStart.disabled = true;
+            btnStart.innerText = 'Acessando Câmera...';
+            try {
+                // Captura câmera e microfone com otimizações para reduzir travamentos
+                const constraints = {
+                    audio: true,
+                    video: {
+                        width: { ideal: 1280, max: 1280 }, // Limita a 720p para economizar banda
+                        height: { ideal: 720, max: 720 },
+                        frameRate: { ideal: 24, max: 30 }  // Reduz os FPS para suavizar a transmissão
+                    }
+                };
+                localStream = await navigator.mediaDevices.getUserMedia(constraints);
+                localVideo.srcObject = localStream;
+                btnStart.innerText = 'Transmitindo (Aguardando Recebedores)';
+                btnStart.style.backgroundColor = '#28a745';
+
+                // Avisa todos os admins que a stream iniciou para eles pedirem a oferta
+                socket.emit('webrtc_stream_started');
+
+            } catch (err) {
+                console.error("Erro ao acessar mídia.", err);
+                alert("Erro ao acessar câmera/microfone: " + err.message);
+                btnStart.disabled = false;
+                btnStart.innerText = 'Iniciar Transmissão';
+            }
+        });
+
+        // Cria a oferta especificamente para o admin que pedir
+        socket.on('request_webrtc_offer', async (data) => {
+            if (!localStream) return; // Ainda não está transmitindo
+
+            const requesterId = data.requesterId;
+            
+            // Se já existia uma conexão para ele, fecha antes de recriar
+            if (peerConnections[requesterId]) {
+                peerConnections[requesterId].close();
+            }
+
+            const pc = new RTCPeerConnection(config);
+            peerConnections[requesterId] = pc;
+            iceCandidateQueues[requesterId] = [];
+
+            pc.onconnectionstatechange = () => {
+                console.log(`Estado WebRTC Captura para ${requesterId}:`, pc.connectionState);
+                if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+                    pc.close();
+                    delete peerConnections[requesterId];
+                }
+            };
+
+            // Adiciona as tracks de mídia à conexão
+            localStream.getTracks().forEach(track => {
+                pc.addTrack(track, localStream);
+            });
+
+            // Escuta os candidatos ICE e envia com alvo específico
+            pc.onicecandidate = event => {
+                if (event.candidate) {
+                    socket.emit('webrtc_ice_candidate', { candidate: event.candidate, targetId: requesterId });
+                }
+            };
+
+            // Gera a chamada (Offer), configura local description e envia para o alvo
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                socket.emit('webrtc_offer', { offer: offer, targetId: requesterId });
+            } catch (e) {
+                console.error("Erro ao criar offer para " + requesterId, e);
+            }
+        });
+
+        // Escuta a resposta (Answer) do receiver
+        socket.on('webrtc_answer', async (data) => {
+            const fromId = data.from;
+            const pc = peerConnections[fromId];
+            if (pc) {
+                try {
+                    const remoteDesc = new RTCSessionDescription(data.answer);
+                    await pc.setRemoteDescription(remoteDesc);
+                    
+                    // Processa candidatos ICE em espera
+                    while (iceCandidateQueues[fromId] && iceCandidateQueues[fromId].length) {
+                        pc.addIceCandidate(iceCandidateQueues[fromId].shift()).catch(e => console.error(e));
+                    }
+                } catch (e) {
+                    console.error("Erro ao configurar remote description de " + fromId, e);
+                }
+            }
+        });
+
+        // Escuta candidatos ICE do receiver
+        socket.on('webrtc_ice_candidate', async (data) => {
+            const fromId = data.from;
+            const pc = peerConnections[fromId];
+            if (pc) {
+                try {
+                    if (pc.remoteDescription && pc.remoteDescription.type) {
+                        await pc.addIceCandidate(data.candidate);
+                    } else {
+                        iceCandidateQueues[fromId].push(data.candidate);
+                    }
+                } catch (e) {
+                    console.error("Erro ao adicionar ICE candidate de " + fromId, e);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

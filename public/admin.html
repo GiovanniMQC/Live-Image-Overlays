@@ -204,8 +204,18 @@
             border: 2px dashed #ff0055;
             box-shadow: 0 0 50px rgba(255, 0, 85, 0.3) inset, 0 0 0 9999px rgba(0,0,0,0.5);
             pointer-events: none;
+            overflow: hidden;
         }
         
+        #remoteVideo {
+            position: absolute;
+            z-index: -1;
+            pointer-events: none;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
         #obs-bounds::after {
             content: 'ÁREA DO OBS (1920x1080) - Tudo fora daqui está invisível no OBS';
             position: absolute;
@@ -485,6 +495,10 @@
 
     <div id="floating-toolbar">
         <div class="tool-container">
+            <button class="tool-btn" id="btn-webrtc" title="Conectar Retorno de Vídeo" style="background-color: #28a745; border-color: #218838;">📡</button>
+        </div>
+
+        <div class="tool-container">
             <button class="tool-btn" title="Cursor e Perfil" onclick="toggleToolPanel('panel-cursor', this)">🖱️</button>
             <div id="panel-cursor" class="tool-panel">
                 <h3>🖱️ Seu Cursor</h3>
@@ -554,7 +568,9 @@
     <div id="workspace">
         <div id="canvas-wrapper">
             <div id="virtual-canvas">
-                <div id="obs-bounds"></div>
+                <div id="obs-bounds">
+                    <video id="remoteVideo" autoplay playsinline></video>
+                </div>
                 <!-- Elementos inseridos aparecerão aqui -->
             </div>
         </div>
@@ -742,8 +758,31 @@
             }
         }
         
+        // ============================================
+        // EMISSÃO OTIMIZADA VIA REQUEST ANIMATION FRAME
+        // ============================================
+        let pendingAdminMouseMove = false;
+        let adminMouseMoveData = {};
+        
+        let pendingDragSync = false;
+        let dragSyncData = {};
+        
+        let pendingScaleSync = false;
+        let scaleSyncData = {};
+
         function renderLoop() {
             updateSelectionUI();
+            
+            // Dispara as emissões pendentes sincronizadas com a taxa de quadros do monitor
+            if (pendingScaleSync) {
+                socket.emit('media:scale_sync', scaleSyncData);
+                pendingScaleSync = false;
+            }
+            if (pendingDragSync) {
+                socket.emit('media:drag_sync', dragSyncData);
+                pendingDragSync = false;
+            }
+
             requestAnimationFrame(renderLoop);
         }
         requestAnimationFrame(renderLoop);
@@ -1790,6 +1829,8 @@
         let resizeStartScaleY = 1;
         let resizeBaseWidth = 0;
         let resizeBaseHeight = 0;
+        
+        let lastMouseMoveEmitTime = 0;
 
         function createDraggableElement(data, startX, startY) {
             mediaState[data.id] = data; // Salva localmente
@@ -1916,18 +1957,25 @@
 
         // Window MouseMove para o arrasto globalmente fluido e Redimensionamento
         window.addEventListener('mousemove', (e) => {
-            // Emite a posição do mouse para os outros admins
+            // Prepara a emissão da posição do mouse para os outros admins
             const rectVirtual = virtualCanvas.getBoundingClientRect();
             const mouseX_inCanvasGlobal = (e.clientX - rectVirtual.left) / currentScale;
             const mouseY_inCanvasGlobal = (e.clientY - rectVirtual.top) / currentScale;
             
-            socket.emit('admin:mousemove', {
+            adminMouseMoveData = {
                 id: socket.id,
                 x: mouseX_inCanvasGlobal,
                 y: mouseY_inCanvasGlobal,
                 name: adminNameInput.value,
                 color: adminColorInput.value
-            });
+            };
+            
+            // Limita a emissão do cursor para os outros admins a ~20 FPS (50ms) para não entupir a rede
+            const now = Date.now();
+            if (now - lastMouseMoveEmitTime > 50) {
+                socket.emit('admin:mousemove', adminMouseMoveData);
+                lastMouseMoveEmitTime = now;
+            }
 
             if (activeResizeElement && !isPanning) {
                 const dx = e.clientX - resizeStartMouseX;
@@ -1956,7 +2004,8 @@
                 
                 activeResizeElement.element.style.transform = `scale(${newSx}, ${newSy})`;
 
-                socket.emit('media:scale_sync', { id: activeResizeElement.id, scaleX: newSx, scaleY: newSy });
+                scaleSyncData = { id: activeResizeElement.id, scaleX: newSx, scaleY: newSy };
+                pendingScaleSync = true;
                 return; // Pula o código de arrastar a imagem
             }
 
@@ -1982,12 +2031,12 @@
                     mediaState[activeDragElement.id].y = newMediaY;
                 }
 
-                // Dispara WebSocket em ALTA FREQUÊNCIA para o efeito "orgânico" no OBS
-                socket.emit('media:drag_sync', {
+                dragSyncData = {
                     id: activeDragElement.id,
                     x: newMediaX,
                     y: newMediaY
-                });
+                };
+                pendingDragSync = true;
             }
         });
 
@@ -2183,6 +2232,128 @@
                 delete cursors[id];
             }
         });
+
+        // ================= WEBRTC RECEIVER =====================
+        const btnWebrtc = document.getElementById('btn-webrtc');
+        const remoteVideo = document.getElementById('remoteVideo');
+        let webrtcPeerConnection;
+        let iceCandidateQueue = [];
+        let emitterId = null;
+
+        btnWebrtc.addEventListener('click', () => {
+            btnWebrtc.classList.toggle('active');
+            if (btnWebrtc.classList.contains('active')) {
+                btnWebrtc.style.backgroundColor = '#dc3545';
+                btnWebrtc.style.borderColor = '#c82333';
+                btnWebrtc.innerText = '🛑';
+                btnWebrtc.title = 'Desconectar Retorno de Vídeo';
+                // Preparado para receber chamadas. Apenas ligar o áudio do elemento de video caso bloqueado
+                remoteVideo.play().catch(e => console.log('Aguardando fluxo de video', e));
+                
+                // Pede pro emissor mandar a oferta, caso ele já esteja transmitindo
+                socket.emit('request_webrtc_offer');
+            } else {
+                btnWebrtc.style.backgroundColor = '#28a745';
+                btnWebrtc.style.borderColor = '#218838';
+                btnWebrtc.innerText = '📡';
+                btnWebrtc.title = 'Conectar Retorno de Vídeo';
+                if (webrtcPeerConnection) {
+                    webrtcPeerConnection.close();
+                    webrtcPeerConnection = null;
+                }
+                remoteVideo.srcObject = null;
+                emitterId = null;
+            }
+        });
+
+        // Caso o emissor inicie a transmissão enquanto o admin já estava com o botão ativo
+        socket.on('webrtc_stream_started', () => {
+            if (btnWebrtc.classList.contains('active')) {
+                socket.emit('request_webrtc_offer');
+            }
+        });
+
+        socket.on('webrtc_offer', async (data) => {
+            // Se o botão não estiver ativo, ignorar a offer
+            if (!btnWebrtc.classList.contains('active')) return;
+
+            emitterId = data.emitterId;
+
+                if (webrtcPeerConnection) {
+                    webrtcPeerConnection.close();
+                }
+                iceCandidateQueue = [];
+
+                webrtcPeerConnection = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+            iceCandidateQueue = [];
+
+            // Quando receber o fluxo de mídia, injeta no elemento <video>
+            webrtcPeerConnection.ontrack = event => {
+                const stream = (event.streams && event.streams.length > 0) ? event.streams[0] : new MediaStream([event.track]);
+                if (remoteVideo.srcObject !== stream) {
+                    remoteVideo.srcObject = stream;
+                }
+                
+                remoteVideo.play().catch(e => {
+                    console.error("Autoplay bloqueado pelo navegador. Tentando mutado...", e);
+                    remoteVideo.muted = true;
+                    remoteVideo.play().catch(err => console.error("Erro final ao dar play:", err));
+                });
+            };
+
+            // Monitora o estado da conexão para feedback visual
+            webrtcPeerConnection.onconnectionstatechange = () => {
+                console.log("Estado WebRTC Admin:", webrtcPeerConnection.connectionState);
+                if (webrtcPeerConnection.connectionState === 'connected') {
+                    btnWebrtc.style.backgroundColor = '#17a2b8'; // Azul claro = Conectado
+                    btnWebrtc.title = 'Conectado! Clique para desconectar';
+                } else if (webrtcPeerConnection.connectionState === 'failed' || webrtcPeerConnection.connectionState === 'disconnected') {
+                    btnWebrtc.style.backgroundColor = '#dc3545'; // Vermelho
+                    btnWebrtc.innerText = '⚠️';
+                }
+            };
+
+            // Envia candidatos ICE de volta para o emissor
+            webrtcPeerConnection.onicecandidate = event => {
+                if (event.candidate && emitterId) {
+                    socket.emit('webrtc_ice_candidate', { candidate: event.candidate, targetId: emitterId });
+                }
+            };
+
+            try {
+                await webrtcPeerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                const answer = await webrtcPeerConnection.createAnswer();
+                await webrtcPeerConnection.setLocalDescription(answer);
+                
+                // Envia a resposta de volta via Socket.io para o emissor específico
+                socket.emit('webrtc_answer', { answer: answer, targetId: emitterId });
+                
+                // Processa candidatos ICE em espera
+                while (iceCandidateQueue.length) {
+                    webrtcPeerConnection.addIceCandidate(iceCandidateQueue.shift()).catch(e => console.error(e));
+                }
+            } catch (err) {
+                console.error("Erro no processamento da Offer WebRTC:", err);
+            }
+        });
+
+        // Escuta os candidatos ICE do emissor para completar a conexão
+        socket.on('webrtc_ice_candidate', async (data) => {
+            if (webrtcPeerConnection) {
+                try {
+                    if (webrtcPeerConnection.remoteDescription && webrtcPeerConnection.remoteDescription.type) {
+                        await webrtcPeerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    } else {
+                        iceCandidateQueue.push(new RTCIceCandidate(data.candidate));
+                    }
+                } catch (e) {
+                    console.error("Erro ao adicionar ICE candidate", e);
+                }
+            }
+        });
+        // =======================================================
 
     </script>
 </body>

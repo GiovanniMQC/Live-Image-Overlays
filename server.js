@@ -348,6 +348,43 @@ io.on('connection', (socket) => {
         socket.broadcast.emit('admin:mousemove', data);
     });
 
+    // ================= WEBRTC SIGNALING =====================
+    // Relay the offer from the emitter (captura.html) to the receiver (admin.html)
+    socket.on('webrtc_offer', (data) => {
+        if (data.targetId) {
+            socket.to(data.targetId).emit('webrtc_offer', { offer: data.offer, emitterId: socket.id });
+        } else {
+            socket.broadcast.emit('webrtc_offer', { offer: data, emitterId: socket.id });
+        }
+    });
+
+    socket.on('request_webrtc_offer', () => {
+        socket.broadcast.emit('request_webrtc_offer', { requesterId: socket.id });
+    });
+
+    socket.on('webrtc_stream_started', () => {
+        socket.broadcast.emit('webrtc_stream_started');
+    });
+
+    // Relay the answer from receiver to emitter
+    socket.on('webrtc_answer', (data) => {
+        if (data.targetId) {
+            socket.to(data.targetId).emit('webrtc_answer', { answer: data.answer, from: socket.id });
+        } else {
+            socket.broadcast.emit('webrtc_answer', { answer: data, from: socket.id });
+        }
+    });
+
+    // Relay ICE candidates
+    socket.on('webrtc_ice_candidate', (data) => {
+        if (data.targetId) {
+            socket.to(data.targetId).emit('webrtc_ice_candidate', { candidate: data.candidate, from: socket.id });
+        } else {
+            socket.broadcast.emit('webrtc_ice_candidate', { candidate: data, from: socket.id });
+        }
+    });
+    // ========================================================
+
     socket.on('disconnect', () => {
         console.log('Cliente desconectado:', socket.id);
         socket.broadcast.emit('admin:disconnect', socket.id);
