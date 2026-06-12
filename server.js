@@ -33,9 +33,9 @@ const storage = multer.diskStorage({
         cb(null, uploadsDir)
     },
     filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-        const ext = path.extname(file.originalname);
-        cb(null, 'media-' + uniqueSuffix + ext)
+        // Preserva o nome original e converte a codificação corretamente para UTF-8
+        const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        cb(null, originalName);
     }
 });
 const upload = multer({ storage: storage });
@@ -46,9 +46,9 @@ const audioStorage = multer.diskStorage({
         cb(null, audioUploadsDir)
     },
     filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-        const ext = path.extname(file.originalname);
-        cb(null, 'audio-' + uniqueSuffix + ext)
+        // Preserva o nome original e converte a codificação corretamente para UTF-8
+        const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        cb(null, originalName);
     }
 });
 const uploadAudio = multer({ storage: audioStorage });
@@ -59,7 +59,8 @@ app.post('/upload', upload.single('file'), (req, res) => {
         return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
     }
     // Retorna a URL pública do arquivo
-    res.json({ url: '/uploads/' + req.file.filename });
+    // Adiciona timestamp na query string para forçar o recarregamento caso faça upload de um arquivo com o mesmo nome
+    res.json({ url: '/uploads/' + encodeURIComponent(req.file.filename) + '?v=' + Date.now() });
 });
 
 // Novo endpoint para receber arquivos de áudio
@@ -67,8 +68,8 @@ app.post('/upload-audio', uploadAudio.single('file'), (req, res) => {
     if (!req.file) {
         return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
     }
-    // Retorna a URL pública do arquivo
-    res.json({ url: '/audio_uploads/' + req.file.filename });
+    // Retorna a URL pública do arquivo codificando espaços e caracteres especiais
+    res.json({ url: '/audio_uploads/' + encodeURIComponent(req.file.filename) });
 });
 
 app.use(express.json()); // Necessário para ler o body das requisições POST com JSON
@@ -107,13 +108,14 @@ app.get('/api/audio-list', (req, res) => {
     try {
         const files = fs.readdirSync(audioUploadsDir);
         const audioFiles = files.filter(f => f.match(/\.(mp3|wav|ogg|aac|m4a)$/i));
-        const fileUrls = audioFiles.map(f => '/audio_uploads/' + f);
+        const fileUrls = audioFiles.map(f => '/audio_uploads/' + encodeURIComponent(f));
         
         // Adiciona novos arquivos à lista se não existirem
         fileUrls.forEach(url => {
             if (!audioList.find(a => a.url === url)) {
-                const filename = url.split('/').pop();
-                const shortName = filename.length > 15 ? filename.substring(0, 12) + '...' : filename;
+                const filename = decodeURIComponent(url.split('/').pop());
+                const nameWithoutExt = filename.replace(/\.[^/.]+$/, ""); // Remove extensão
+                const shortName = nameWithoutExt.length > 25 ? nameWithoutExt.substring(0, 22) + '...' : nameWithoutExt;
                 audioList.push({
                     id: 'up-' + Date.now() + Math.random().toString(36).substring(2,9),
                     name: shortName,
@@ -174,7 +176,7 @@ app.post('/api/audio-delete/:id', (req, res) => {
         
         // Se for um arquivo local de upload, apaga do disco permanentemente
         if (audio.url.startsWith('/audio_uploads/')) {
-            const filename = path.basename(audio.url);
+            const filename = decodeURIComponent(audio.url.split('/').pop());
             const filepath = path.join(audioUploadsDir, filename);
             try { if (fs.existsSync(filepath)) fs.unlinkSync(filepath); } catch(e) {}
         }
@@ -327,7 +329,8 @@ io.on('connection', (socket) => {
             
             // Apaga arquivo local se existir
             if (url && url.startsWith('/uploads/')) {
-                const filename = path.basename(url);
+                // Tira query string e decodifica a URI
+                const filename = decodeURIComponent(url.split('?')[0].split('/').pop());
                 const filepath = path.join(uploadsDir, filename);
                 try {
                     if (fs.existsSync(filepath)) {

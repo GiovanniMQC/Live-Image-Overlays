@@ -1873,7 +1873,7 @@
                     }
                 });
             } else {
-                const isVideo = data.url && data.url.match(/\.(mp4|webm|ogg)$/i);
+                const isVideo = data.url && data.url.split('?')[0].match(/\.(mp4|webm|ogg)$/i);
                 if (isVideo) {
                     mediaEl = document.createElement('video');
                     mediaEl.src = data.url;
