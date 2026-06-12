@@ -239,60 +239,63 @@
             cursor: grabbing;
         }
 
-        .draggable-controls {
+        #selection-toolbar {
             position: absolute;
-            top: -55px;
-            left: 0;
             display: flex;
             gap: 8px;
-            background: rgba(0,0,0,0.9);
-            padding: 8px;
+            background: rgba(0,0,0,0.95);
+            padding: 8px 12px;
             border-radius: 8px;
+            border: 1px solid #444;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+            transform: translate(0, -10px);
+            z-index: 10000;
             opacity: 0;
-            transition: opacity 0.2s;
-            pointer-events: none;
-            transform: scale(1); /* Control buttons ignore image scale */
-            transform-origin: bottom left;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s, transform 0.2s;
+            align-items: center;
         }
-
-        .draggable:hover .draggable-controls,
-        .draggable.selected .draggable-controls {
+        #selection-toolbar.show {
             opacity: 1;
+            visibility: visible;
             pointer-events: auto;
+            transform: translate(0, -100%);
         }
 
-        .draggable-controls button {
-            background: #555; border: none; color: white; padding: 8px 12px; cursor: pointer; border-radius: 4px; font-size: 15px; display: flex; align-items: center; gap: 5px; font-weight: bold;
+        #selection-toolbar button {
+            background: #333; border: 1px solid #555; color: white; padding: 8px 12px;
+            border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;
+            display: flex; align-items: center; gap: 6px; transition: all 0.1s;
         }
-        .draggable-controls button.btn-hide { background: #d39e00; }
-        .draggable-controls button.btn-delete { background: #dc3545; }
-        .draggable-controls button.btn-layer { background: #17a2b8; }
+        #selection-toolbar button:hover { background: #4a4a4a; transform: scale(1.05); }
+        #selection-toolbar button.danger { background: #dc3545; border-color: #bd2130; }
+        #selection-toolbar button.danger:hover { background: #c82333; }
+        #selection-toolbar .video-only { display: none; }
+        
+        #ctx-video-seek { width: 100px; cursor: pointer; }
 
         .hidden-media {
             opacity: 0.3 !important;
             outline-color: #d39e00 !important;
         }
 
-        .resize-handle {
+        #global-resize-handle {
             position: absolute;
-            bottom: -12px;
-            right: -12px;
             width: 24px;
             height: 24px;
             background: #00ff88;
             border: 3px solid #222;
             border-radius: 50%;
             cursor: nwse-resize;
+            z-index: 10000;
             opacity: 0;
-            transition: opacity 0.2s;
-            transform-origin: center center;
-            z-index: 10;
+            visibility: hidden;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.2s, visibility 0.2s;
         }
-
-        .draggable:hover .resize-handle,
-        .draggable.selected .resize-handle {
+        #global-resize-handle.show {
             opacity: 1;
+            visibility: visible;
         }
         
         /* Dica de scroll */
@@ -555,6 +558,17 @@
                 <!-- Elementos inseridos aparecerão aqui -->
             </div>
         </div>
+        
+        <!-- UI Global de Seleção (Fora do scale da imagem) -->
+        <div id="selection-toolbar">
+            <button id="btn-ctx-layer-up" title="Trazer para Frente">⏫</button>
+            <button id="btn-ctx-layer-down" title="Enviar para Trás">⏬</button>
+            <button id="btn-ctx-hide" title="Ocultar/Mostrar">👁️ Ocultar</button>
+            <button id="btn-ctx-mute" class="video-only" title="Mudo/Áudio">🔊 Áudio</button>
+            <input type="range" id="ctx-video-seek" class="video-only" min="0" max="100" value="0">
+            <button id="btn-ctx-delete" class="danger" title="Excluir">🗑️ Excluir</button>
+        </div>
+        <div id="global-resize-handle"></div>
     </div>
     
     <div id="audio-edit-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100000; align-items: center; justify-content: center;">
@@ -647,6 +661,79 @@
         const currentAudioName = document.getElementById('current-audio-name');
         
         let globalAudio = new Audio();
+
+        // Elementos do Context Toolbar
+        const selectionToolbar = document.getElementById('selection-toolbar');
+        const globalResizeHandle = document.getElementById('global-resize-handle');
+        const btnCtxLayerUp = document.getElementById('btn-ctx-layer-up');
+        const btnCtxLayerDown = document.getElementById('btn-ctx-layer-down');
+        const btnCtxHide = document.getElementById('btn-ctx-hide');
+        const btnCtxDelete = document.getElementById('btn-ctx-delete');
+        const btnCtxMute = document.getElementById('btn-ctx-mute');
+        const ctxVideoSeek = document.getElementById('ctx-video-seek');
+        
+        let lastToolbarLeft, lastToolbarTop, lastHandleLeft, lastHandleTop, lastVideoSeek;
+        
+        function updateSelectionUI() {
+            if (!selectedElementId) {
+                if (selectionToolbar.classList.contains('show')) {
+                    selectionToolbar.classList.remove('show');
+                    globalResizeHandle.classList.remove('show');
+                }
+                return;
+            }
+            
+            const el = document.getElementById(`admin-${selectedElementId}`);
+            const media = mediaState[selectedElementId];
+            if (!el || !media) return;
+
+            const sx = media.scaleX !== undefined ? media.scaleX : (media.scale || 1);
+            const sy = media.scaleY !== undefined ? media.scaleY : (media.scale || 1);
+
+            const contentEl = el.querySelector('.media-content');
+            if (!contentEl) return;
+            
+            const baseWidth = contentEl.offsetWidth || 1;
+            const baseHeight = contentEl.offsetHeight || 1;
+
+            const realWidth = baseWidth * sx * currentScale;
+            const realHeight = baseHeight * sy * currentScale;
+
+            const leftPos = (media.x + canvasPadding) * currentScale;
+            const topPos = (media.y + canvasPadding) * currentScale;
+
+            if (lastToolbarLeft !== leftPos || lastToolbarTop !== topPos) {
+                selectionToolbar.style.left = leftPos + 'px';
+                selectionToolbar.style.top = (topPos - 15) + 'px';
+                lastToolbarLeft = leftPos;
+                lastToolbarTop = topPos;
+            }
+            if (!selectionToolbar.classList.contains('show')) selectionToolbar.classList.add('show');
+
+            const handleLeft = leftPos + realWidth;
+            const handleTop = topPos + realHeight;
+            if (lastHandleLeft !== handleLeft || lastHandleTop !== handleTop) {
+                globalResizeHandle.style.left = handleLeft + 'px';
+                globalResizeHandle.style.top = handleTop + 'px';
+                lastHandleLeft = handleLeft;
+                lastHandleTop = handleTop;
+            }
+            if (!globalResizeHandle.classList.contains('show')) globalResizeHandle.classList.add('show');
+
+            if (contentEl.tagName === 'VIDEO' && document.activeElement !== ctxVideoSeek && !isNaN(contentEl.duration) && contentEl.duration > 0) {
+                const seekVal = (contentEl.currentTime / contentEl.duration) * 100;
+                if (Math.abs((lastVideoSeek || 0) - seekVal) > 0.1) {
+                    ctxVideoSeek.value = seekVal;
+                    lastVideoSeek = seekVal;
+                }
+            }
+        }
+        
+        function renderLoop() {
+            updateSelectionUI();
+            requestAnimationFrame(renderLoop);
+        }
+        requestAnimationFrame(renderLoop);
         
         function toggleSoundpad() {
             document.getElementById('soundpad-sidebar').classList.toggle('open');
@@ -1136,6 +1223,29 @@
             selectedElementId = null;
         }
 
+         function selectElement(id) {
+            if (selectedElementId === id) return;
+            clearSelection();
+            selectedElementId = id;
+            const el = document.getElementById(`admin-${id}`);
+            if (el) el.classList.add('selected');
+            
+            const media = mediaState[id];
+            if (media) {
+                btnCtxHide.innerHTML = media.visible ? '👁️ Ocultar' : '🙈 Mostrar';
+                const contentEl = el ? el.querySelector('.media-content') : null;
+                if (contentEl && contentEl.tagName === 'VIDEO') {
+                    btnCtxMute.style.display = 'flex';
+                    ctxVideoSeek.style.display = 'block';
+                    btnCtxMute.innerHTML = media.muted ? '🔇 Mudo' : '🔊 Áudio';
+                } else {
+                    btnCtxMute.style.display = 'none';
+                    ctxVideoSeek.style.display = 'none';
+                }
+            }
+            updateSelectionUI();
+        }
+
         window.addEventListener('keydown', (e) => {
             // Previne atalhos se estiver digitando numa caixa de texto ou elemento de texto editável
             if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.isContentEditable)) return;
@@ -1195,11 +1305,6 @@
                     container.style.left = (media.x + canvasPadding) + 'px';
                     container.style.top = (media.y + canvasPadding) + 'px';
                     container.style.transform = `scale(${media.scaleX}, ${media.scaleY})`;
-                    
-                    const controls = container.querySelector('.draggable-controls');
-                    if (controls) controls.style.transform = `scale(${1 / media.scaleX}, ${1 / media.scaleY})`;
-                    const resizeHandle = container.querySelector('.resize-handle');
-                    if (resizeHandle) resizeHandle.style.transform = `scale(${1 / media.scaleX}, ${1 / media.scaleY})`;
 
                     // Emite pro servidor/OBS
                     socket.emit('media:drag_sync', { id: id, x: media.x, y: media.y });
@@ -1218,10 +1323,10 @@
                     media.visible = !media.visible;
                     if (media.visible) {
                         container.classList.remove('hidden-media');
-                        if (btnVisibility) btnVisibility.innerText = '👁️ Ocultar';
+                        if (selectedElementId === id && btnCtxHide) btnCtxHide.innerText = '👁️ Ocultar';
                     } else {
                         container.classList.add('hidden-media');
-                        if (btnVisibility) btnVisibility.innerText = '🙈 Mostrar';
+                        if (selectedElementId === id && btnCtxHide) btnCtxHide.innerText = '🙈 Mostrar';
                     }
                     socket.emit('media:toggle_visibility', { id: id, visible: media.visible });
                 }
@@ -1449,16 +1554,6 @@
                     mediaState[id].scaleX = sx;
                     mediaState[id].scaleY = sy;
                     draggable.style.transform = `scale(${sx}, ${sy})`;
-                    
-                    // Ajusta escala invertida dos controles para eles não ficarem gigantes/minúsculos
-                    const controls = draggable.querySelector('.draggable-controls');
-                    if (controls) {
-                        controls.style.transform = `scale(${1 / sx}, ${1 / sy})`;
-                    }
-                    const resizeHandle = draggable.querySelector('.resize-handle');
-                    if (resizeHandle) {
-                        resizeHandle.style.transform = `scale(${1 / sx}, ${1 / sy})`;
-                    }
 
                     // Envia para o OBS
                     socket.emit('media:scale_sync', { id: id, scaleX: sx, scaleY: sy });
@@ -1576,10 +1671,6 @@
                 const el = document.getElementById(`admin-${data.id}`);
                 if (el) {
                     el.style.transform = `scale(${data.scaleX}, ${data.scaleY})`;
-                    const controls = el.querySelector('.draggable-controls');
-                    if (controls) controls.style.transform = `scale(${1 / data.scaleX}, ${1 / data.scaleY})`;
-                    const resizeHandle = el.querySelector('.resize-handle');
-                    if (resizeHandle) resizeHandle.style.transform = `scale(${1 / data.scaleX}, ${1 / data.scaleY})`;
                 }
             }
         });
@@ -1613,10 +1704,10 @@
                     const btnVisibility = el.querySelector('.btn-hide');
                     if (data.visible) {
                         el.classList.remove('hidden-media');
-                        if (btnVisibility) btnVisibility.innerText = '👁️ Ocultar';
+                        if (selectedElementId === data.id && btnCtxHide) btnCtxHide.innerText = '👁️ Ocultar';
                     } else {
                         el.classList.add('hidden-media');
-                        if (btnVisibility) btnVisibility.innerText = '🙈 Mostrar';
+                        if (selectedElementId === data.id && btnCtxHide) btnCtxHide.innerText = '🙈 Mostrar';
                     }
                 }
             }
@@ -1627,7 +1718,7 @@
                 delete mediaState[data.id];
                 const el = document.getElementById(`admin-${data.id}`);
                 if (el) {
-                    if (selectedElementId === data.id) selectedElementId = null;
+                    if (selectedElementId === data.id) clearSelection();
                     if (activeDragElement && activeDragElement.id === data.id) activeDragElement = null;
                     if (activeResizeElement && activeResizeElement.id === data.id) activeResizeElement = null;
                     el.remove();
@@ -1641,9 +1732,8 @@
                 const el = document.getElementById(`admin-${data.id}`);
                 if (el) {
                     const video = el.querySelector('video');
-                    const btnMute = el.querySelector('.btn-video-mute');
                     if (video) video.muted = data.muted;
-                    if (btnMute) btnMute.innerText = data.muted ? '🔇 Mudo' : '🔊 Áudio';
+                    if (selectedElementId === data.id && btnCtxMute) btnCtxMute.innerText = data.muted ? '🔇 Mudo' : '🔊 Áudio';
                 }
             }
         });
@@ -1703,125 +1793,6 @@
             container.style.transform = `scale(${sx}, ${sy})`;
             
             if (!data.visible) container.classList.add('hidden-media');
-
-            // Handle de redimensionamento no canto inferior direito
-            const resizeHandle = document.createElement('div');
-            resizeHandle.classList.add('resize-handle');
-            // Mantém tamanho fixo independente do zoom da imagem
-            resizeHandle.style.transform = `scale(${1 / sx}, ${1 / sy})`;
-            
-            resizeHandle.addEventListener('mousedown', (e) => {
-                e.stopPropagation(); // Impede que o clique inicie o Drag (Mover imagem)
-                e.preventDefault();
-                
-                clearSelection();
-                container.classList.add('selected');
-                selectedElementId = data.id;
-
-                activeResizeElement = {
-                    element: container,
-                    id: data.id,
-                    handle: resizeHandle
-                };
-
-                resizeStartMouseX = e.clientX;
-                resizeStartMouseY = e.clientY;
-                
-                resizeStartScaleX = mediaState[data.id].scaleX !== undefined ? mediaState[data.id].scaleX : (mediaState[data.id].scale || 1);
-                resizeStartScaleY = mediaState[data.id].scaleY !== undefined ? mediaState[data.id].scaleY : (mediaState[data.id].scale || 1);
-                
-                // Largura nativa real antes do CSS Scale atuar
-                const contentEl = container.querySelector('.media-content');
-                resizeBaseWidth = contentEl ? contentEl.offsetWidth : 100;
-                resizeBaseHeight = contentEl ? contentEl.offsetHeight : 100;
-            });
-
-            container.appendChild(resizeHandle);
-
-            // Barra de controles (Ocultar / Deletar)
-            const controls = document.createElement('div');
-            controls.classList.add('draggable-controls');
-            // Mantém os botões em escala legível
-            controls.style.transform = `scale(${1 / sx}, ${1 / sy})`;
-
-            const btnLayerUp = document.createElement('button');
-            btnLayerUp.classList.add('btn-layer');
-            btnLayerUp.innerText = '⏫';
-            btnLayerUp.title = 'Trazer para Frente';
-            btnLayerUp.addEventListener('click', () => {
-                let maxOtherZ = -Infinity;
-                for (let key in mediaState) {
-                    if (key !== data.id) {
-                        let otherZ = mediaState[key].zIndex !== undefined ? mediaState[key].zIndex : 10;
-                        if (otherZ > maxOtherZ) maxOtherZ = otherZ;
-                    }
-                }
-                
-                let currentZ = mediaState[data.id].zIndex !== undefined ? mediaState[data.id].zIndex : 10;
-
-                // Se houverem outras imagens e eu não estiver estritamente acima delas, salto pra cima
-                if (maxOtherZ !== -Infinity && currentZ <= maxOtherZ) {
-                    let z = maxOtherZ + 1;
-                    mediaState[data.id].zIndex = z;
-                    container.style.zIndex = z;
-                    socket.emit('media:layer_sync', { id: data.id, zIndex: z });
-                }
-            });
-
-            const btnLayerDown = document.createElement('button');
-            btnLayerDown.classList.add('btn-layer');
-            btnLayerDown.innerText = '⏬';
-            btnLayerDown.title = 'Enviar para Trás';
-            btnLayerDown.addEventListener('click', () => {
-                let minOtherZ = Infinity;
-                for (let key in mediaState) {
-                    if (key !== data.id) {
-                        let otherZ = mediaState[key].zIndex !== undefined ? mediaState[key].zIndex : 10;
-                        if (otherZ < minOtherZ) minOtherZ = otherZ;
-                    }
-                }
-                
-                let currentZ = mediaState[data.id].zIndex !== undefined ? mediaState[data.id].zIndex : 10;
-
-                // Se houverem outras imagens e eu não estiver estritamente abaixo delas, salto pra baixo
-                if (minOtherZ !== Infinity && currentZ >= minOtherZ) {
-                    let z = minOtherZ - 1;
-                    mediaState[data.id].zIndex = z;
-                    container.style.zIndex = z;
-                    socket.emit('media:layer_sync', { id: data.id, zIndex: z });
-                }
-            });
-            
-            const btnVisibility = document.createElement('button');
-            btnVisibility.classList.add('btn-hide');
-            btnVisibility.innerText = data.visible ? '👁️ Ocultar' : '🙈 Mostrar';
-            
-            btnVisibility.addEventListener('click', () => {
-                data.visible = !data.visible;
-                if (data.visible) {
-                    container.classList.remove('hidden-media');
-                    btnVisibility.innerText = '👁️ Ocultar';
-                } else {
-                    container.classList.add('hidden-media');
-                    btnVisibility.innerText = '🙈 Mostrar';
-                }
-                socket.emit('media:toggle_visibility', { id: data.id, visible: data.visible });
-            });
-
-            const btnDelete = document.createElement('button');
-            btnDelete.classList.add('btn-delete');
-            btnDelete.innerText = '🗑️ Excluir';
-            
-            btnDelete.addEventListener('click', () => {
-                container.remove();
-                delete mediaState[data.id];
-                socket.emit('media:delete', { id: data.id });
-            });
-
-            controls.appendChild(btnLayerUp);
-            controls.appendChild(btnLayerDown);
-            controls.appendChild(btnVisibility);
-            controls.appendChild(btnDelete);
 
             // A Mídia em si
             let mediaEl;
@@ -1883,45 +1854,6 @@
                     data.muted = mediaEl.muted;
                     mediaEl.classList.add('media-content');
 
-                    const btnMute = document.createElement('button');
-                    btnMute.className = 'btn-video-mute';
-                    btnMute.innerText = mediaEl.muted ? '🔇 Mudo' : '🔊 Áudio';
-                    btnMute.title = 'Alternar Áudio do Vídeo';
-                    btnMute.onclick = (e) => {
-                        e.stopPropagation();
-                        mediaEl.muted = !mediaEl.muted;
-                        data.muted = mediaEl.muted;
-                        btnMute.innerText = mediaEl.muted ? '🔇 Mudo' : '🔊 Áudio';
-                        socket.emit('media:video_mute', { id: data.id, muted: mediaEl.muted });
-                    };
-
-                    const seekInput = document.createElement('input');
-                    seekInput.type = 'range';
-                    seekInput.min = 0;
-                    seekInput.max = 100;
-                    seekInput.value = 0;
-                    seekInput.style.width = '80px';
-                    seekInput.style.cursor = 'pointer';
-                    seekInput.title = 'Tempo do Vídeo';
-                    seekInput.onmousedown = (e) => e.stopPropagation(); // Previne iniciar arrasto da imagem ao clicar na barra
-                    seekInput.oninput = (e) => {
-                        e.stopPropagation();
-                        if (mediaEl.duration) {
-                            const time = (seekInput.value / 100) * mediaEl.duration;
-                            mediaEl.currentTime = time;
-                            socket.emit('media:video_seek', { id: data.id, currentTime: time });
-                        }
-                    };
-
-                    mediaEl.addEventListener('timeupdate', () => {
-                        if (mediaEl.duration && document.activeElement !== seekInput) {
-                            seekInput.value = (mediaEl.currentTime / mediaEl.duration) * 100;
-                        }
-                    });
-
-                    controls.appendChild(btnMute);
-                    controls.appendChild(seekInput);
-
                     // Aplica a posição de tempo correta caso exista nos dados
                     if (data.currentTime) {
                         mediaEl.currentTime = data.currentTime;
@@ -1934,23 +1866,19 @@
                 }
             }
 
-            container.appendChild(controls);
             container.appendChild(mediaEl);
             virtualCanvas.appendChild(container);
 
             // Eventos do mouse para arrastar a imagem
             container.addEventListener('mousedown', (e) => {
-                if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+                if (mediaEl.contentEditable === "true") return;
                 
                 // Tira o foco de caixas de texto para permitir os atalhos de teclado funcionarem
                 if (document.activeElement && document.activeElement.tagName === 'INPUT') {
                     document.activeElement.blur();
                 }
 
-                // Lida com seleção
-                clearSelection();
-                container.classList.add('selected');
-                selectedElementId = data.id;
+                selectElement(data.id);
 
                 activeDragElement = {
                     element: container,
@@ -2014,11 +1942,6 @@
                 mediaState[activeResizeElement.id].scaleY = newSy;
                 
                 activeResizeElement.element.style.transform = `scale(${newSx}, ${newSy})`;
-                
-                const controls = activeResizeElement.element.querySelector('.draggable-controls');
-                if (controls) controls.style.transform = `scale(${1 / newSx}, ${1 / newSy})`;
-                
-                if (activeResizeElement.handle) activeResizeElement.handle.style.transform = `scale(${1 / newSx}, ${1 / newSy})`;
 
                 socket.emit('media:scale_sync', { id: activeResizeElement.id, scaleX: newSx, scaleY: newSy });
                 return; // Pula o código de arrastar a imagem
@@ -2038,11 +1961,19 @@
                 activeDragElement.element.style.left = newLeft + 'px';
                 activeDragElement.element.style.top = newTop + 'px';
 
+                const newMediaX = Math.round(newLeft - canvasPadding);
+                const newMediaY = Math.round(newTop - canvasPadding);
+                
+                if (mediaState[activeDragElement.id]) {
+                    mediaState[activeDragElement.id].x = newMediaX;
+                    mediaState[activeDragElement.id].y = newMediaY;
+                }
+
                 // Dispara WebSocket em ALTA FREQUÊNCIA para o efeito "orgânico" no OBS
                 socket.emit('media:drag_sync', {
                     id: activeDragElement.id,
-                    x: Math.round(newLeft - canvasPadding),
-                    y: Math.round(newTop - canvasPadding)
+                    x: newMediaX,
+                    y: newMediaY
                 });
             }
         });
@@ -2057,6 +1988,124 @@
             activeResizeElement = null;
         });
 
+         // ============================================
+        // EVENTOS DA NOVA BARRA GLOBAL E RESIZE
+        // ============================================
+        btnCtxLayerUp.addEventListener('click', () => {
+            if (!selectedElementId) return;
+            const id = selectedElementId;
+            let maxOtherZ = -Infinity;
+            for (let key in mediaState) {
+                if (key !== id) {
+                    let otherZ = mediaState[key].zIndex !== undefined ? mediaState[key].zIndex : 10;
+                    if (otherZ > maxOtherZ) maxOtherZ = otherZ;
+                }
+            }
+            let currentZ = mediaState[id].zIndex !== undefined ? mediaState[id].zIndex : 10;
+            if (maxOtherZ !== -Infinity && currentZ <= maxOtherZ) {
+                let z = maxOtherZ + 1;
+                mediaState[id].zIndex = z;
+                const container = document.getElementById(`admin-${id}`);
+                if (container) container.style.zIndex = z;
+                socket.emit('media:layer_sync', { id: id, zIndex: z });
+            }
+        });
+
+        btnCtxLayerDown.addEventListener('click', () => {
+            if (!selectedElementId) return;
+            const id = selectedElementId;
+            let minOtherZ = Infinity;
+            for (let key in mediaState) {
+                if (key !== id) {
+                    let otherZ = mediaState[key].zIndex !== undefined ? mediaState[key].zIndex : 10;
+                    if (otherZ < minOtherZ) minOtherZ = otherZ;
+                }
+            }
+            let currentZ = mediaState[id].zIndex !== undefined ? mediaState[id].zIndex : 10;
+            if (minOtherZ !== Infinity && currentZ >= minOtherZ) {
+                let z = minOtherZ - 1;
+                mediaState[id].zIndex = z;
+                const container = document.getElementById(`admin-${id}`);
+                if (container) container.style.zIndex = z;
+                socket.emit('media:layer_sync', { id: id, zIndex: z });
+            }
+        });
+
+        btnCtxHide.addEventListener('click', () => {
+            if (!selectedElementId) return;
+            const id = selectedElementId;
+            const media = mediaState[id];
+            media.visible = !media.visible;
+            const container = document.getElementById(`admin-${id}`);
+            if (container) {
+                if (media.visible) {
+                    container.classList.remove('hidden-media');
+                    btnCtxHide.innerText = '👁️ Ocultar';
+                } else {
+                    container.classList.add('hidden-media');
+                    btnCtxHide.innerText = '🙈 Mostrar';
+                }
+            }
+            socket.emit('media:toggle_visibility', { id: id, visible: media.visible });
+        });
+
+        btnCtxDelete.addEventListener('click', () => {
+            if (!selectedElementId) return;
+            const id = selectedElementId;
+            const container = document.getElementById(`admin-${id}`);
+            if (container) container.remove();
+            delete mediaState[id];
+            socket.emit('media:delete', { id: id });
+            clearSelection();
+        });
+
+        btnCtxMute.addEventListener('click', () => {
+            if (!selectedElementId) return;
+            const id = selectedElementId;
+            const media = mediaState[id];
+            const container = document.getElementById(`admin-${id}`);
+            const video = container ? container.querySelector('video') : null;
+            if (video) {
+                video.muted = !video.muted;
+                media.muted = video.muted;
+                btnCtxMute.innerText = video.muted ? '🔇 Mudo' : '🔊 Áudio';
+                socket.emit('media:video_mute', { id: id, muted: video.muted });
+            }
+        });
+
+        ctxVideoSeek.addEventListener('input', () => {
+            if (!selectedElementId) return;
+            const id = selectedElementId;
+            const container = document.getElementById(`admin-${id}`);
+            const video = container ? container.querySelector('video') : null;
+            if (video && video.duration) {
+                const time = (ctxVideoSeek.value / 100) * video.duration;
+                video.currentTime = time;
+                socket.emit('media:video_seek', { id: id, currentTime: time });
+            }
+        });
+
+        globalResizeHandle.addEventListener('mousedown', (e) => {
+            if (!selectedElementId) return;
+            e.stopPropagation();
+            e.preventDefault();
+            
+            const id = selectedElementId;
+            const container = document.getElementById(`admin-${id}`);
+
+            activeResizeElement = { element: container, id: id };
+
+            resizeStartMouseX = e.clientX;
+            resizeStartMouseY = e.clientY;
+            
+            resizeStartScaleX = mediaState[id].scaleX !== undefined ? mediaState[id].scaleX : (mediaState[id].scale || 1);
+            resizeStartScaleY = mediaState[id].scaleY !== undefined ? mediaState[id].scaleY : (mediaState[id].scale || 1);
+            
+            const contentEl = container.querySelector('.media-content');
+            resizeBaseWidth = contentEl ? contentEl.offsetWidth : 100;
+            resizeBaseHeight = contentEl ? contentEl.offsetHeight : 100;
+        });
+        
         // ============================================
         // CURSORES DOS OUTROS ADMINS
         // ============================================
