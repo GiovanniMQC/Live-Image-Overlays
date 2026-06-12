@@ -33,6 +33,21 @@
             justify-content: center;
             cursor: pointer;
         }
+
+        /* Solução para artefatos de renderização (tearing) no OBS/Chromium */
+        .media-content {
+            display: block !important;
+            transform: translateZ(0);
+            backface-visibility: hidden;
+            will-change: transform;
+            image-rendering: crisp-edges;
+            clip-path: inset(0.5px);
+        }
+
+        .media-crop-wrapper {
+            overflow: hidden;
+            transform: translateZ(0);
+        }
     </style>
 </head>
 <body>
@@ -44,7 +59,70 @@
         
         // Elementos atualmente no DOM
         const mediaElements = {};
+        const mediaState = {};
         let globalAudio = new Audio();
+
+        function applyTransform(id) {
+            const media = mediaState[id];
+            const container = mediaElements[id];
+            if (!container || !media) return;
+            
+            const sx = media.scaleX !== undefined ? media.scaleX : (media.scale || 1);
+            const sy = media.scaleY !== undefined ? media.scaleY : (media.scale || 1);
+            const rot = media.rotation || 0;
+            
+            container.style.transform = `translateZ(0) rotate(${rot}deg) scale(${sx}, ${sy})`;
+            
+            const wrapperEl = container.querySelector('.media-crop-wrapper');
+            const contentEl = container.querySelector('.media-content');
+            if (wrapperEl && contentEl) {
+                const flipX = media.flipX ? -1 : 1;
+                const flipY = media.flipY ? -1 : 1;
+                wrapperEl.style.transform = `scale(${flipX}, ${flipY})`;
+                
+                if (media.type === 'text') {
+                    contentEl.style.width = 'max-content';
+                    contentEl.style.height = 'max-content';
+                    contentEl.style.maxWidth = 'none';
+                    contentEl.style.maxHeight = 'none';
+                    wrapperEl.style.width = 'max-content';
+                    wrapperEl.style.height = 'max-content';
+                } else {
+                    let baseWidth = parseFloat(contentEl.dataset.baseWidth);
+                    let baseHeight = parseFloat(contentEl.dataset.baseHeight);
+
+                    if (!baseWidth || baseWidth < 2) {
+                        baseWidth = contentEl.offsetWidth;
+                        baseHeight = contentEl.offsetHeight;
+                        if (baseWidth > 2) {
+                            contentEl.dataset.baseWidth = baseWidth;
+                            contentEl.dataset.baseHeight = baseHeight;
+                            contentEl.style.width = Math.round(baseWidth) + 'px';
+                            contentEl.style.height = Math.round(baseHeight) + 'px';
+                            contentEl.style.maxWidth = 'none';
+                            contentEl.style.maxHeight = 'none';
+                        } else {
+                            baseWidth = 100;
+                            baseHeight = 100;
+                        }
+                    }
+
+                    const crop = media.crop || { t: 0, r: 0, b: 0, l: 0 };
+                    const cT = Math.round(crop.t);
+                    const cR = Math.round(crop.r);
+                    const cB = Math.round(crop.b);
+                    const cL = Math.round(crop.l);
+                    const visibleWidth = Math.round(Math.max(1, baseWidth - cL - cR));
+                    const visibleHeight = Math.round(Math.max(1, baseHeight - cT - cB));
+
+                    wrapperEl.style.width = visibleWidth + 'px';
+                    wrapperEl.style.height = visibleHeight + 'px';
+
+                    contentEl.style.marginLeft = `-${cL}px`;
+                    contentEl.style.marginTop = `-${cT}px`;
+                }
+            }
+        }
 
         // Ao conectar, pede o estado atual ao servidor para exibir o que já está na tela
         socket.on('connect', () => {
@@ -139,19 +217,54 @@
             // Limpa elementos atuais no dom
             Object.values(mediaElements).forEach(el => el.remove());
             for(let key in mediaElements) delete mediaElements[key];
+            for(let key in mediaState) delete mediaState[key];
 
             stateList.forEach(data => createOrUpdateMedia(data));
         });
+
+        const pendingRenders = new Set();
+        let renderScheduled = false;
+
+        function scheduleRender(id) {
+            if (id) pendingRenders.add(id);
+            if (!renderScheduled) {
+                renderScheduled = true;
+                requestAnimationFrame(flushRenders);
+            }
+        }
+
+        function flushRenders() {
+            pendingRenders.forEach(id => {
+                const el = mediaElements[id];
+                const data = mediaState[id];
+                if (el && data) {
+                    if (data.x !== undefined) el.style.left = data.x + 'px';
+                    if (data.y !== undefined) el.style.top = data.y + 'px';
+                    if (data.zIndex !== undefined) el.style.zIndex = data.zIndex;
+                    
+                    if (data.visible !== undefined) {
+                        el.style.display = data.visible ? 'block' : 'none';
+                    }
+                    if (data.opacity !== undefined && el.firstChild) {
+                        el.firstChild.style.opacity = data.opacity;
+                    }
+                    
+                    applyTransform(id);
+                }
+            });
+            pendingRenders.clear();
+            renderScheduled = false;
+        }
 
         socket.on('media:create', (data) => {
             createOrUpdateMedia(data);
         });
 
         socket.on('media:drag_sync', (data) => {
-            const el = mediaElements[data.id];
-            if (el) {
-                el.style.left = data.x + 'px';
-                el.style.top = data.y + 'px';
+            if (mediaState[data.id]) {
+                mediaState[data.id].x = data.x;
+                mediaState[data.id].y = data.y;
+                scheduleRender(data.id);
             }
         });
 
@@ -159,7 +272,7 @@
             if (mediaState[data.id]) {
                 mediaState[data.id].scaleX = data.scaleX !== undefined ? data.scaleX : (data.scale || 1);
                 mediaState[data.id].scaleY = data.scaleY !== undefined ? data.scaleY : (data.scale || 1);
-                applyTransform(data.id);
+                scheduleRender(data.id);
             }
         });
 
@@ -168,31 +281,37 @@
                 mediaState[data.id].rotation = data.rotation;
                 mediaState[data.id].flipX = data.flipX;
                 mediaState[data.id].flipY = data.flipY;
-                applyTransform(data.id);
+                if (data.x !== undefined) mediaState[data.id].x = data.x;
+                if (data.y !== undefined) mediaState[data.id].y = data.y;
+                scheduleRender(data.id);
             }
         });
 
         socket.on('media:crop_sync', (data) => {
             if (mediaState[data.id]) {
                 mediaState[data.id].crop = data.crop;
-                applyTransform(data.id);
+                scheduleRender(data.id);
             }
         });
 
         socket.on('media:update_text', (data) => {
-            const container = mediaElements[data.id];
-            if (container) {
-                const textEl = container.querySelector('.media-content');
-                if (textEl) {
-                    textEl.innerText = data.text;
+            if (mediaState[data.id]) {
+                mediaState[data.id].text = data.text;
+                const container = mediaElements[data.id];
+                if (container) {
+                    const textEl = container.querySelector('.media-content');
+                    if (textEl) {
+                        textEl.innerText = data.text;
+                        scheduleRender(data.id);
+                    }
                 }
             }
         });
 
         socket.on('media:layer_sync', (data) => {
-            const el = mediaElements[data.id];
-            if (el) {
-                el.style.zIndex = data.zIndex !== undefined ? data.zIndex : 10;
+            if (mediaState[data.id]) {
+                mediaState[data.id].zIndex = data.zIndex !== undefined ? data.zIndex : 10;
+                scheduleRender(data.id);
             }
         });
 
@@ -213,16 +332,16 @@
         });
 
         socket.on('media:opacity_sync', (data) => {
-            const el = mediaElements[data.id];
-            if (el && el.firstChild) {
-                el.firstChild.style.opacity = data.opacity;
+            if (mediaState[data.id]) {
+                mediaState[data.id].opacity = data.opacity;
+                scheduleRender(data.id);
             }
         });
 
         socket.on('media:toggle_visibility', (data) => {
-            const el = mediaElements[data.id];
-            if (el) {
-                el.style.display = data.visible ? 'block' : 'none';
+            if (mediaState[data.id]) {
+                mediaState[data.id].visible = data.visible;
+                scheduleRender(data.id);
             }
         });
 
@@ -250,6 +369,7 @@
             container.style.display = data.visible ? 'block' : 'none';
             container.style.transformOrigin = 'top left';
             container.style.zIndex = data.zIndex !== undefined ? data.zIndex : 10;
+            container.style.willChange = 'transform, left, top';
             
             let mediaEl;
             if (data.type === 'text') {
@@ -282,6 +402,7 @@
                 mediaEl.style.display = 'block';
                 mediaEl.style.maxWidth = '500px';
                 mediaEl.style.maxHeight = '500px';
+                mediaEl.classList.add('media-content');
             }
 
             mediaEl.style.pointerEvents = 'none';
@@ -291,10 +412,22 @@
                 mediaEl.style.opacity = data.opacity;
             }
 
-            container.appendChild(mediaEl);
+            const cropWrapper = document.createElement('div');
+            cropWrapper.classList.add('media-crop-wrapper');
+            cropWrapper.style.overflow = 'hidden';
+            cropWrapper.style.position = 'relative';
+
+            cropWrapper.appendChild(mediaEl);
+            container.appendChild(cropWrapper);
             document.body.appendChild(container);
             
             mediaElements[data.id] = container;
+            
+            if (mediaEl.tagName === 'IMG') {
+                mediaEl.onload = () => applyTransform(data.id);
+            } else if (mediaEl.tagName === 'VIDEO') {
+                mediaEl.onloadedmetadata = () => applyTransform(data.id);
+            }
             applyTransform(data.id);
         }
 

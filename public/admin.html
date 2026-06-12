@@ -230,8 +230,8 @@
             position: absolute;
             cursor: grab;
             user-select: none;
-            outline: 3px solid transparent;
             transform-origin: top left;
+            will-change: transform, left, top;
         }
 
         .draggable:hover {
@@ -308,6 +308,76 @@
             visibility: visible;
         }
         
+        #global-rotate-handle {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: #007bff;
+            border: 3px solid #222;
+            border-radius: 50%;
+            cursor: grab;
+            z-index: 10000;
+            opacity: 0;
+            visibility: hidden;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.2s, visibility 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        #global-rotate-handle::after {
+            content: '↻';
+            color: white;
+            font-weight: bold;
+        }
+        #global-rotate-handle.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        #global-rotate-handle:active {
+            cursor: grabbing;
+        }
+
+        /* Sistema de Crop (Corte) com Alt */
+        .crop-ui {
+            position: absolute;
+            top: 0; right: 0; bottom: 0; left: 0;
+            pointer-events: none;
+            display: none;
+            border: 2px dashed #ff0055;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            z-index: 105;
+        }
+        body.alt-pressed .draggable.selected .crop-ui {
+            display: block;
+        }
+        body.alt-pressed #global-resize-handle,
+        body.alt-pressed #global-rotate-handle {
+            opacity: 0 !important;
+            pointer-events: none;
+        }
+        
+        body.multi-select .crop-ui {
+            display: none !important;
+        }
+        .crop-edge {
+            position: absolute;
+            pointer-events: auto;
+            background: rgba(255, 0, 85, 0.5);
+            transition: background 0.2s;
+        }
+        .crop-edge:hover { background: rgba(255, 0, 85, 0.9); }
+        .crop-t { top: -6px; left: 10px; right: 10px; height: 12px; cursor: ns-resize; }
+        .crop-b { bottom: -6px; left: 10px; right: 10px; height: 12px; cursor: ns-resize; }
+        .crop-l { top: 10px; left: -6px; bottom: 10px; width: 12px; cursor: ew-resize; }
+        .crop-r { top: 10px; right: -6px; bottom: 10px; width: 12px; cursor: ew-resize; }
+        
+        .crop-tl { top: -6px; left: -6px; width: 12px; height: 12px; cursor: nwse-resize; }
+        .crop-tr { top: -6px; right: -6px; width: 12px; height: 12px; cursor: nesw-resize; }
+        .crop-bl { bottom: -6px; left: -6px; width: 12px; height: 12px; cursor: nesw-resize; }
+        .crop-br { bottom: -6px; right: -6px; width: 12px; height: 12px; cursor: nwse-resize; }
+        
         /* Dica de scroll */
         .tooltip {
             position: absolute;
@@ -342,10 +412,21 @@
         /* Limita tamanho inicial visual na criação apenas usando estilos de base.
            Mas como escalonamos, vamos focar no width real. */
         .media-content {
-            display: block;
+            display: block !important;
             /* pointer-events: none; REMOVIDO para permitir clique e edição no texto */
             max-width: 500px; /* Tamanho base padrão para inserção */
             max-height: 500px;
+            /* Solução para artefatos de renderização (tearing) no Chromium */
+            transform: translateZ(0);
+            backface-visibility: hidden;
+            will-change: transform;
+            image-rendering: crisp-edges;
+            clip-path: inset(0.5px);
+        }
+
+        .media-crop-wrapper {
+            overflow: hidden;
+            transform: translateZ(0); /* Força a camada isolada também no pai */
         }
 
         #upload-overlay {
@@ -571,6 +652,7 @@
                 <div id="obs-bounds">
                     <video id="remoteVideo" autoplay playsinline></video>
                 </div>
+                <div id="marquee-box" style="position: absolute; border: 1px solid rgba(0, 123, 255, 0.8); background: rgba(0, 123, 255, 0.2); display: none; pointer-events: none; z-index: 99999;"></div>
                 <!-- Elementos inseridos aparecerão aqui -->
             </div>
         </div>
@@ -586,6 +668,7 @@
             <button id="btn-ctx-delete" class="danger" title="Excluir">🗑️ Excluir</button>
         </div>
         <div id="global-resize-handle"></div>
+        <div id="global-rotate-handle"></div>
     </div>
     
     <div id="audio-edit-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100000; align-items: center; justify-content: center;">
@@ -684,6 +767,7 @@
         // Elementos do Context Toolbar
         const selectionToolbar = document.getElementById('selection-toolbar');
         const globalResizeHandle = document.getElementById('global-resize-handle');
+        const globalRotateHandle = document.getElementById('global-rotate-handle');
         const btnCtxLayerUp = document.getElementById('btn-ctx-layer-up');
         const btnCtxLayerDown = document.getElementById('btn-ctx-layer-down');
         const btnCtxHide = document.getElementById('btn-ctx-hide');
@@ -705,9 +789,14 @@
         btnCtxRotate.title = "Rotacionar 90º";
         btnCtxRotate.innerText = "🔄";
 
+        const btnCtxDuplicate = document.createElement('button');
+        btnCtxDuplicate.title = "Duplicar (Ctrl+D)";
+        btnCtxDuplicate.innerText = "📄";
+
         selectionToolbar.insertBefore(btnCtxRotate, btnCtxDelete);
         selectionToolbar.insertBefore(btnCtxFlipH, btnCtxRotate);
         selectionToolbar.insertBefore(btnCtxFlipV, btnCtxRotate);
+        selectionToolbar.insertBefore(btnCtxDuplicate, btnCtxDelete);
 
         // Carrega as preferências do usuário salvas no navegador
         if (localStorage.getItem('adminName')) {
@@ -720,7 +809,7 @@
         adminNameInput.addEventListener('input', () => localStorage.setItem('adminName', adminNameInput.value));
         adminColorInput.addEventListener('input', () => localStorage.setItem('adminColor', adminColorInput.value));
         
-        let lastToolbarLeft, lastToolbarTop, lastHandleLeft, lastHandleTop, lastVideoSeek;
+        let lastToolbarLeft, lastToolbarTop, lastHandleLeft, lastHandleTop, lastRotateHandleLeft, lastRotateHandleTop, lastVideoSeek;
         
         function applyTransform(id) {
             const media = mediaState[id];
@@ -731,31 +820,151 @@
             const sy = media.scaleY !== undefined ? media.scaleY : (media.scale || 1);
             const rot = media.rotation || 0;
             
-            container.style.transform = `rotate(${rot}deg) scale(${sx}, ${sy})`;
+            container.style.transform = `translateZ(0) rotate(${rot}deg) scale(${sx}, ${sy})`;
             
+            const wrapperEl = container.querySelector('.media-crop-wrapper');
             const contentEl = container.querySelector('.media-content');
-            if (contentEl) {
+            if (wrapperEl && contentEl) {
                 const flipX = media.flipX ? -1 : 1;
                 const flipY = media.flipY ? -1 : 1;
-                contentEl.style.transform = `scale(${flipX}, ${flipY})`;
+                wrapperEl.style.transform = `scale(${flipX}, ${flipY})`;
                 
-                const crop = media.crop || { t: 0, r: 0, b: 0, l: 0 };
-                contentEl.style.clipPath = `inset(${crop.t}px ${crop.r}px ${crop.b}px ${crop.l}px)`;
+                if (media.type === 'text') {
+                    contentEl.style.width = 'max-content';
+                    contentEl.style.height = 'max-content';
+                    contentEl.style.maxWidth = 'none';
+                    contentEl.style.maxHeight = 'none';
+                    wrapperEl.style.width = 'max-content';
+                    wrapperEl.style.height = 'max-content';
+                } else {
+                    let baseWidth = parseFloat(contentEl.dataset.baseWidth);
+                    let baseHeight = parseFloat(contentEl.dataset.baseHeight);
+
+                    if (!baseWidth || baseWidth < 2) {
+                        baseWidth = contentEl.offsetWidth;
+                        baseHeight = contentEl.offsetHeight;
+                        if (baseWidth > 2) {
+                            contentEl.dataset.baseWidth = baseWidth;
+                            contentEl.dataset.baseHeight = baseHeight;
+                            contentEl.style.width = Math.round(baseWidth) + 'px';
+                            contentEl.style.height = Math.round(baseHeight) + 'px';
+                            contentEl.style.maxWidth = 'none';
+                            contentEl.style.maxHeight = 'none';
+                        } else {
+                            baseWidth = 100;
+                            baseHeight = 100;
+                        }
+                    }
+
+                    const crop = media.crop || { t: 0, r: 0, b: 0, l: 0 };
+                    const cT = Math.round(crop.t);
+                    const cR = Math.round(crop.r);
+                    const cB = Math.round(crop.b);
+                    const cL = Math.round(crop.l);
+                    const visibleWidth = Math.round(Math.max(1, baseWidth - cL - cR));
+                    const visibleHeight = Math.round(Math.max(1, baseHeight - cT - cB));
+
+                    wrapperEl.style.width = visibleWidth + 'px';
+                    wrapperEl.style.height = visibleHeight + 'px';
+
+                    contentEl.style.marginLeft = `-${cL}px`;
+                    contentEl.style.marginTop = `-${cT}px`;
+                }
             }
-            updateSelectionUI();
+            
+            const cropUI = container.querySelector('.crop-ui');
+            if (cropUI) {
+                cropUI.style.top = '0px';
+                cropUI.style.right = '0px';
+                cropUI.style.bottom = '0px';
+                cropUI.style.left = '0px';
+            }
+
+            if (selectedElements.has(id)) {
+                updateSelectionUI();
+            }
         }
 
         function updateSelectionUI() {
-            if (!selectedElementId) {
-                if (selectionToolbar.classList.contains('show')) {
-                    selectionToolbar.classList.remove('show');
-                    globalResizeHandle.classList.remove('show');
+            if (selectedElements.size === 0) {
+                selectionToolbar.classList.remove('show');
+                globalResizeHandle.classList.remove('show');
+                globalRotateHandle.classList.remove('show');
+                return;
+            }
+
+            if (selectedElements.size > 1) {
+                document.body.classList.add('multi-select');
+                globalResizeHandle.classList.remove('show');
+                globalRotateHandle.classList.remove('show');
+                
+                let minX = Infinity, minY = Infinity;
+                
+                selectedElements.forEach(id => {
+                    const media = mediaState[id];
+                    const el = document.getElementById(`admin-${id}`);
+                    if (!media || !el) return;
+                    
+                    const sx = media.scaleX !== undefined ? media.scaleX : (media.scale || 1);
+                    const sy = media.scaleY !== undefined ? media.scaleY : (media.scale || 1);
+                    const rot = media.rotation || 0;
+                    const rad = rot * Math.PI / 180;
+
+                    const contentEl = el.querySelector('.media-content');
+                    if (!contentEl) return;
+                    
+                    const baseWidth = contentEl.offsetWidth || 1;
+                    const baseHeight = contentEl.offsetHeight || 1;
+
+                    const crop = media.crop || { t: 0, r: 0, b: 0, l: 0 };
+                    let uiT = Math.round(crop.t), uiR = Math.round(crop.r), uiB = Math.round(crop.b), uiL = Math.round(crop.l);
+                    if (media.flipX) { uiL = Math.round(crop.r); uiR = Math.round(crop.l); }
+                    if (media.flipY) { uiT = Math.round(crop.b); uiB = Math.round(crop.t); }
+
+                    const visibleWidth = Math.max(1, Math.round(baseWidth) - uiL - uiR);
+                    const visibleHeight = Math.max(1, Math.round(baseHeight) - uiT - uiB);
+
+                    const leftPos = (media.x + canvasPadding) * currentScale;
+                    const topPos = (media.y + canvasPadding) * currentScale;
+
+                    const corners = [
+                        {x: 0, y: 0},
+                        {x: visibleWidth, y: 0},
+                        {x: visibleWidth, y: visibleHeight},
+                        {x: 0, y: visibleHeight}
+                    ];
+
+                    corners.forEach(c => {
+                        const sx_c = c.x * sx;
+                        const sy_c = c.y * sy;
+                        const rx = sx_c * Math.cos(rad) - sy_c * Math.sin(rad);
+                        const ry = sx_c * Math.sin(rad) + sy_c * Math.cos(rad);
+                        const finalX = leftPos + rx * currentScale;
+                        const finalY = topPos + ry * currentScale;
+                        if (finalX < minX) minX = finalX;
+                        if (finalY < minY) minY = finalY;
+                    });
+                });
+
+                if (minX !== Infinity) {
+                    const selectionLeft = minX;
+                    const selectionTop = minY;
+                    if (lastToolbarLeft !== selectionLeft || lastToolbarTop !== selectionTop) {
+                        selectionToolbar.style.left = selectionLeft + 'px';
+                        selectionToolbar.style.top = (selectionTop - 15) + 'px';
+                        lastToolbarLeft = selectionLeft;
+                        lastToolbarTop = selectionTop;
+                    }
+                    if (!selectionToolbar.classList.contains('show')) selectionToolbar.classList.add('show');
                 }
                 return;
             }
-            
-            const el = document.getElementById(`admin-${selectedElementId}`);
-            const media = mediaState[selectedElementId];
+
+            // Lógica original para 1 elemento selecionado
+            document.body.classList.remove('multi-select');
+            const id = Array.from(selectedElements)[0];
+            const el = document.getElementById(`admin-${id}`);
+            const media = mediaState[id];
             if (!el || !media) return;
 
             const sx = media.scaleX !== undefined ? media.scaleX : (media.scale || 1);
@@ -770,17 +979,21 @@
             const baseHeight = contentEl.offsetHeight || 1;
 
             const crop = media.crop || { t: 0, r: 0, b: 0, l: 0 };
-            const visibleWidth = Math.max(1, baseWidth - crop.l - crop.r);
-            const visibleHeight = Math.max(1, baseHeight - crop.t - crop.b);
+            let uiT = Math.round(crop.t), uiR = Math.round(crop.r), uiB = Math.round(crop.b), uiL = Math.round(crop.l);
+            if (media.flipX) { uiL = Math.round(crop.r); uiR = Math.round(crop.l); }
+            if (media.flipY) { uiT = Math.round(crop.b); uiB = Math.round(crop.t); }
+
+            const visibleWidth = Math.max(1, Math.round(baseWidth) - uiL - uiR);
+            const visibleHeight = Math.max(1, Math.round(baseHeight) - uiT - uiB);
 
             const leftPos = (media.x + canvasPadding) * currentScale;
             const topPos = (media.y + canvasPadding) * currentScale;
 
             const corners = [
-                {x: crop.l, y: crop.t},
-                {x: crop.l + visibleWidth, y: crop.t},
-                {x: crop.l + visibleWidth, y: crop.t + visibleHeight},
-                {x: crop.l, y: crop.t + visibleHeight}
+                {x: 0, y: 0},
+                {x: visibleWidth, y: 0},
+                {x: visibleWidth, y: visibleHeight},
+                {x: 0, y: visibleHeight}
             ];
             
             let minX = Infinity, minY = Infinity;
@@ -804,9 +1017,8 @@
             }
             if (!selectionToolbar.classList.contains('show')) selectionToolbar.classList.add('show');
 
-            // Handle is at the bottom right of the VISIBLE area.
-            const unscaledCornerX = crop.l + visibleWidth;
-            const unscaledCornerY = crop.t + visibleHeight;
+            const unscaledCornerX = visibleWidth;
+            const unscaledCornerY = visibleHeight;
             const scaledCornerX = unscaledCornerX * sx;
             const scaledCornerY = unscaledCornerY * sy;
             const hrx = scaledCornerX * Math.cos(rad) - scaledCornerY * Math.sin(rad);
@@ -823,6 +1035,30 @@
             }
             if (!globalResizeHandle.classList.contains('show')) globalResizeHandle.classList.add('show');
 
+            const unscaledTopRightX = visibleWidth;
+            const unscaledTopRightY = 0;
+            const scaledTopRightX = unscaledTopRightX * sx;
+            const scaledTopRightY = unscaledTopRightY * sy;
+            
+            const trhrx = scaledTopRightX * Math.cos(rad) - scaledTopRightY * Math.sin(rad);
+            const trhry = scaledTopRightX * Math.sin(rad) + scaledTopRightY * Math.cos(rad);
+
+            const offsetUpX = Math.sin(rad) * 20;
+            const offsetUpY = -Math.cos(rad) * 20;
+            const offsetRightX = Math.cos(rad) * 20;
+            const offsetRightY = Math.sin(rad) * 20;
+
+            const rotateHandleLeft = leftPos + (trhrx * currentScale) + offsetUpX + offsetRightX;
+            const rotateHandleTop = topPos + (trhry * currentScale) + offsetUpY + offsetRightY;
+
+            if (lastRotateHandleLeft !== rotateHandleLeft || lastRotateHandleTop !== rotateHandleTop) {
+                globalRotateHandle.style.left = rotateHandleLeft + 'px';
+                globalRotateHandle.style.top = rotateHandleTop + 'px';
+                lastRotateHandleLeft = rotateHandleLeft;
+                lastRotateHandleTop = rotateHandleTop;
+            }
+            if (!globalRotateHandle.classList.contains('show')) globalRotateHandle.classList.add('show');
+
             if (contentEl.tagName === 'VIDEO' && document.activeElement !== ctxVideoSeek && !isNaN(contentEl.duration) && contentEl.duration > 0) {
                 const seekVal = (contentEl.currentTime / contentEl.duration) * 100;
                 if (Math.abs((lastVideoSeek || 0) - seekVal) > 0.1) {
@@ -830,6 +1066,50 @@
                     lastVideoSeek = seekVal;
                 }
             }
+        }
+
+        function setRotationAroundCenter(id, newRotation, startX = null, startY = null, startRot = null) {
+            const media = mediaState[id];
+            if (!media) return;
+            
+            const oldRot = startRot !== null ? startRot : (media.rotation || 0);
+            const oldRad = oldRot * Math.PI / 180;
+            const newRad = newRotation * Math.PI / 180;
+            
+            const container = document.getElementById(`admin-${id}`);
+            const contentEl = container ? container.querySelector('.media-content') : null;
+            const baseWidth = contentEl ? (contentEl.offsetWidth || 1) : 100;
+            const baseHeight = contentEl ? (contentEl.offsetHeight || 1) : 100;
+            
+            const crop = media.crop || { t: 0, r: 0, b: 0, l: 0 };
+            let uiT = Math.round(crop.t), uiR = Math.round(crop.r), uiB = Math.round(crop.b), uiL = Math.round(crop.l);
+            if (media.flipX) { uiL = Math.round(crop.r); uiR = Math.round(crop.l); }
+            if (media.flipY) { uiT = Math.round(crop.b); uiB = Math.round(crop.t); }
+
+            const visibleWidth = Math.max(1, Math.round(baseWidth) - uiL - uiR);
+            const visibleHeight = Math.max(1, Math.round(baseHeight) - uiT - uiB);
+            
+            const cx = visibleWidth / 2;
+            const cy = visibleHeight / 2;
+            
+            const sx = media.scaleX !== undefined ? media.scaleX : (media.scale || 1);
+            const sy = media.scaleY !== undefined ? media.scaleY : (media.scale || 1);
+            
+            const scaledCx = cx * sx;
+            const scaledCy = cy * sy;
+            
+            const oldRx = scaledCx * Math.cos(oldRad) - scaledCy * Math.sin(oldRad);
+            const oldRy = scaledCx * Math.sin(oldRad) + scaledCy * Math.cos(oldRad);
+            
+            const newRx = scaledCx * Math.cos(newRad) - scaledCy * Math.sin(newRad);
+            const newRy = scaledCx * Math.sin(newRad) + scaledCy * Math.cos(newRad);
+            
+            const baseX = startX !== null ? startX : media.x;
+            const baseY = startY !== null ? startY : media.y;
+
+            media.x = Math.round(baseX + oldRx - newRx);
+            media.y = Math.round(baseY + oldRy - newRy);
+            media.rotation = newRotation;
         }
         
         // ============================================
@@ -839,10 +1119,16 @@
         let adminMouseMoveData = {};
         
         let pendingDragSync = false;
-        let dragSyncData = {};
+        let dragSyncDataMap = {};
         
         let pendingScaleSync = false;
         let scaleSyncData = {};
+        
+        let pendingTransformSync = false;
+        let transformSyncData = {};
+
+        let pendingCropSync = false;
+        let cropSyncDataMap = {};
 
         function renderLoop() {
             updateSelectionUI();
@@ -853,8 +1139,18 @@
                 pendingScaleSync = false;
             }
             if (pendingDragSync) {
-                socket.emit('media:drag_sync', dragSyncData);
+                Object.values(dragSyncDataMap).forEach(data => socket.emit('media:drag_sync', data));
+                dragSyncDataMap = {};
                 pendingDragSync = false;
+            }
+            if (pendingTransformSync) {
+                socket.emit('media:transform_sync', transformSyncData);
+                pendingTransformSync = false;
+            }
+            if (pendingCropSync) {
+                Object.values(cropSyncDataMap).forEach(data => socket.emit('media:crop_sync', data));
+                cropSyncDataMap = {};
+                pendingCropSync = false;
             }
 
             requestAnimationFrame(renderLoop);
@@ -1342,22 +1638,25 @@
         // ============================================
         // ATALHOS DE TECLADO E SELEÇÃO
         // ============================================
-        let selectedElementId = null;
+        let selectedElements = new Set();
 
         function clearSelection() {
             document.querySelectorAll('.draggable').forEach(el => el.classList.remove('selected'));
-            selectedElementId = null;
+            selectedElements.clear();
+            updateSelectionUI();
         }
 
-         function selectElement(id) {
-            if (selectedElementId === id) return;
-            clearSelection();
-            selectedElementId = id;
+        function selectElement(id, multi = false) {
+            if (!multi) {
+                if (selectedElements.size === 1 && selectedElements.has(id)) return;
+                clearSelection();
+            }
+            selectedElements.add(id);
             const el = document.getElementById(`admin-${id}`);
             if (el) el.classList.add('selected');
             
             const media = mediaState[id];
-            if (media) {
+            if (media && selectedElements.size === 1) {
                 btnCtxHide.innerHTML = media.visible ? '👁️ Ocultar' : '🙈 Mostrar';
                 const contentEl = el ? el.querySelector('.media-content') : null;
                 if (contentEl && contentEl.tagName === 'VIDEO') {
@@ -1373,103 +1672,180 @@
             updateSelectionUI();
         }
 
+        function duplicateSelectedMedia() {
+            if (selectedElements.size === 0) return;
+            
+            const newIds = [];
+            let maxZ = 0;
+            Object.values(mediaState).forEach(m => {
+                const z = m.zIndex !== undefined ? m.zIndex : 10;
+                if (z > maxZ) maxZ = z;
+            });
+
+            selectedElements.forEach(id => {
+                const originalMedia = mediaState[id];
+                if (!originalMedia) return;
+
+                const newMediaData = structuredClone(originalMedia);
+                newMediaData.id = 'media_' + Math.random().toString(36).substring(2, 9);
+                newMediaData.x += 25;
+                newMediaData.y += 25;
+
+                maxZ++;
+                newMediaData.zIndex = maxZ;
+                newMediaData.isFullScreen = false;
+                delete newMediaData.savedState;
+
+                const canvasX = newMediaData.x + canvasPadding;
+                const canvasY = newMediaData.y + canvasPadding;
+                createDraggableElement(newMediaData, canvasX, canvasY);
+                socket.emit('media:create', newMediaData);
+                newIds.push(newMediaData.id);
+            });
+            clearSelection();
+            newIds.forEach(id => selectElement(id, true));
+        }
+
+        let isSpacePressed = false;
         window.addEventListener('keydown', (e) => {
             // Previne atalhos se estiver digitando numa caixa de texto ou elemento de texto editável
             if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.isContentEditable)) return;
 
-            if (e.key === 'Delete' && selectedElementId) {
-                const container = document.getElementById(`admin-${selectedElementId}`);
-                if (container) {
-                    container.remove();
-                    socket.emit('media:delete', { id: selectedElementId });
-                    delete mediaState[selectedElementId];
-                    selectedElementId = null;
-                }
+            if (e.key === 'Delete' && selectedElements.size > 0) {
+                selectedElements.forEach(id => {
+                    const container = document.getElementById(`admin-${id}`);
+                    if (container) {
+                        container.remove();
+                        socket.emit('media:delete', { id: id });
+                        delete mediaState[id];
+                    }
+                });
+                clearSelection();
+            }
+
+            // Atalho Ctrl+D para Duplicar
+            if (e.ctrlKey && (e.key === 'd' || e.key === 'D')) {
+                e.preventDefault(); // Previne o atalho de "Adicionar aos Favoritos" do navegador
+                duplicateSelectedMedia();
             }
 
             // Atalho F para Fullscreen
-            if ((e.key === 'f' || e.key === 'F') && selectedElementId) {
-                const id = selectedElementId;
-                const media = mediaState[id];
-                const container = document.getElementById(`admin-${id}`);
-                const contentEl = container ? container.querySelector('.media-content') : null;
+            if ((e.key === 'f' || e.key === 'F') && selectedElements.size > 0) {
+                selectedElements.forEach(id => {
+                    const media = mediaState[id];
+                    const container = document.getElementById(`admin-${id}`);
+                    const contentEl = container ? container.querySelector('.media-content') : null;
 
-                if (media && container && contentEl) {
-                    if (!media.isFullScreen) {
-                        // Salva o estado atual
-                        media.savedState = {
-                            x: media.x,
-                            y: media.y,
-                            scaleX: media.scaleX !== undefined ? media.scaleX : (media.scale || 1),
-                            scaleY: media.scaleY !== undefined ? media.scaleY : (media.scale || 1)
-                        };
+                    if (media && container && contentEl) {
+                        if (!media.isFullScreen) {
+                            // Salva o estado atual
+                            media.savedState = {
+                                x: media.x,
+                                y: media.y,
+                                scaleX: media.scaleX !== undefined ? media.scaleX : (media.scale || 1),
+                                scaleY: media.scaleY !== undefined ? media.scaleY : (media.scale || 1)
+                            };
 
-                        // Calcula a escala necessária
-                        const baseWidth = contentEl.offsetWidth || 1;
-                        const baseHeight = contentEl.offsetHeight || 1;
-                        
-                        const newScaleX = 1920 / baseWidth;
-                        const newScaleY = 1080 / baseHeight;
+                            // Calcula a escala necessária
+                            const baseWidth = contentEl.offsetWidth || 1;
+                            const baseHeight = contentEl.offsetHeight || 1;
+                            
+                            const newScaleX = 1920 / baseWidth;
+                            const newScaleY = 1080 / baseHeight;
 
-                        // Aplica estado Full Screen
-                        media.x = 0;
-                        media.y = 0;
-                        media.scaleX = newScaleX;
-                        media.scaleY = newScaleY;
-                        media.isFullScreen = true;
-                    } else {
-                        // Restaura estado anterior
-                        if (media.savedState) {
-                            media.x = media.savedState.x;
-                            media.y = media.savedState.y;
-                            media.scaleX = media.savedState.scaleX;
-                            media.scaleY = media.savedState.scaleY;
+                            // Aplica estado Full Screen
+                            media.x = 0;
+                            media.y = 0;
+                            media.scaleX = newScaleX;
+                            media.scaleY = newScaleY;
+                            media.isFullScreen = true;
+                        } else {
+                            // Restaura estado anterior
+                            if (media.savedState) {
+                                media.x = media.savedState.x;
+                                media.y = media.savedState.y;
+                                media.scaleX = media.savedState.scaleX;
+                                media.scaleY = media.savedState.scaleY;
+                            }
+                            media.isFullScreen = false;
                         }
-                        media.isFullScreen = false;
+
+                        // Atualiza localmente
+                        container.style.left = (media.x + canvasPadding) + 'px';
+                        container.style.top = (media.y + canvasPadding) + 'px';
+                        applyTransform(id);
+
+                        // Emite pro servidor/OBS
+                        socket.emit('media:drag_sync', { id: id, x: media.x, y: media.y });
+                        socket.emit('media:scale_sync', { id: id, scaleX: media.scaleX, scaleY: media.scaleY });
                     }
-
-                    // Atualiza localmente
-                    container.style.left = (media.x + canvasPadding) + 'px';
-                    container.style.top = (media.y + canvasPadding) + 'px';
-                    container.style.transform = `scale(${media.scaleX}, ${media.scaleY})`;
-
-                    // Emite pro servidor/OBS
-                    socket.emit('media:drag_sync', { id: id, x: media.x, y: media.y });
-                    socket.emit('media:scale_sync', { id: id, scaleX: media.scaleX, scaleY: media.scaleY });
-                }
+                });
             }
 
             // Atalho H para Ocultar/Mostrar
-            if ((e.key === 'h' || e.key === 'H') && selectedElementId) {
-                const id = selectedElementId;
-                const media = mediaState[id];
-                const container = document.getElementById(`admin-${id}`);
-                const btnVisibility = container ? container.querySelector('.btn-hide') : null;
-
-                if (media && container) {
-                    media.visible = !media.visible;
-                    if (media.visible) {
-                        container.classList.remove('hidden-media');
-                        if (selectedElementId === id && btnCtxHide) btnCtxHide.innerText = '👁️ Ocultar';
-                    } else {
-                        container.classList.add('hidden-media');
-                        if (selectedElementId === id && btnCtxHide) btnCtxHide.innerText = '🙈 Mostrar';
+            if ((e.key === 'h' || e.key === 'H') && selectedElements.size > 0) {
+                let anyVisible = false;
+                selectedElements.forEach(id => { if (mediaState[id] && mediaState[id].visible) anyVisible = true; });
+                const newState = !anyVisible;
+                
+                selectedElements.forEach(id => {
+                    const media = mediaState[id];
+                    const container = document.getElementById(`admin-${id}`);
+                    if (media && container) {
+                        media.visible = newState;
+                        if (newState) {
+                            container.classList.remove('hidden-media');
+                        } else {
+                            container.classList.add('hidden-media');
+                        }
+                        socket.emit('media:toggle_visibility', { id: id, visible: media.visible });
                     }
-                    socket.emit('media:toggle_visibility', { id: id, visible: media.visible });
-                }
+                });
+                if (selectedElements.size === 1) btnCtxHide.innerText = newState ? '👁️ Ocultar' : '🙈 Mostrar';
+             }
+
+            // Mostra o sistema de Crop ao segurar o Alt
+            if (e.key === 'Alt' && !document.body.classList.contains('alt-pressed')) {
+                document.body.classList.add('alt-pressed');
+            }
+            
+            if (e.code === 'Space') {
+                isSpacePressed = true;
+                workspace.style.cursor = 'grab';
+                e.preventDefault();
             }
         });
 
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'Alt') {
+                document.body.classList.remove('alt-pressed');
+            }
+            if (e.code === 'Space') {
+                isSpacePressed = false;
+                workspace.style.cursor = 'auto';
+            }
+        });
+
+        window.addEventListener('blur', () => {
+            // Remove a interface de crop se a janela perder o foco
+            document.body.classList.remove('alt-pressed');
+            activeCropElement = null;
+            isSpacePressed = false;
+            workspace.style.cursor = 'auto';
+        });
+
         // ============================================
-        // PAN DO WORKSPACE (Arrastar fundo)
+        // PAN DO WORKSPACE E MARQUEE SELECTION
         // ============================================
         let isPanning = false;
+        let isMarquee = false;
         let panStartX, panStartY, scrollStartX, scrollStartY;
+        let marqueeStartX, marqueeStartY;
+        const marqueeBox = document.getElementById('marquee-box');
 
         workspace.addEventListener('mousedown', (e) => {
-            // Se clicou direto no wrapper ou canvas (não em mídias) inicia o pan e limpa a seleção
             if (e.target === workspace || e.target === virtualCanvas || e.target === canvasWrapper || e.target.id === 'obs-bounds') { 
-                if (e.button === 0 || e.button === 1) { // Left or Middle click
+                if (e.button === 1 || (e.button === 0 && isSpacePressed)) { // Middle click ou Space + Left click
                     isPanning = true;
                     workspace.style.cursor = 'grabbing';
                     panStartX = e.clientX;
@@ -1478,10 +1854,23 @@
                     scrollStartY = workspace.scrollTop;
                     e.preventDefault();
                     
-                    // Clicou no fundo, limpa a imagem selecionada
                     clearSelection();
                     
-                    // Desfoca qualquer campo de texto para atalhos funcionarem
+                    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.isContentEditable)) {
+                        document.activeElement.blur();
+                    }
+                } else if (e.button === 0) { // Left click normal para Marquee
+                    isMarquee = true;
+                    if (!e.shiftKey) clearSelection();
+                    const rect = canvasWrapper.getBoundingClientRect();
+                    marqueeStartX = (e.clientX - rect.left) / currentScale;
+                    marqueeStartY = (e.clientY - rect.top) / currentScale;
+                    marqueeBox.style.display = 'block';
+                    marqueeBox.style.left = marqueeStartX + 'px';
+                    marqueeBox.style.top = marqueeStartY + 'px';
+                    marqueeBox.style.width = '0px';
+                    marqueeBox.style.height = '0px';
+                    
                     if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.isContentEditable)) {
                         document.activeElement.blur();
                     }
@@ -1496,12 +1885,58 @@
                 workspace.scrollLeft = scrollStartX - dx;
                 workspace.scrollTop = scrollStartY - dy;
             }
+            
+            if (isMarquee) {
+                const rect = canvasWrapper.getBoundingClientRect();
+                const currentX = (e.clientX - rect.left) / currentScale;
+                const currentY = (e.clientY - rect.top) / currentScale;
+
+                const left = Math.min(marqueeStartX, currentX);
+                const top = Math.min(marqueeStartY, currentY);
+                const width = Math.abs(currentX - marqueeStartX);
+                const height = Math.abs(currentY - marqueeStartY);
+
+                marqueeBox.style.left = left + 'px';
+                marqueeBox.style.top = top + 'px';
+                marqueeBox.style.width = width + 'px';
+                marqueeBox.style.height = height + 'px';
+
+                Object.values(mediaState).forEach(media => {
+                    const el = document.getElementById(`admin-${media.id}`);
+                    const contentEl = el ? el.querySelector('.media-content') : null;
+                    if (!el || !contentEl) return;
+                    
+                    const elLeft = media.x + canvasPadding;
+                    const elTop = media.y + canvasPadding;
+                    const w = contentEl.offsetWidth * (media.scaleX || media.scale || 1);
+                    const h = contentEl.offsetHeight * (media.scaleY || media.scale || 1);
+
+                    const overlap = !(elLeft > left + width ||
+                                      elLeft + w < left ||
+                                      elTop > top + height ||
+                                      elTop + h < top);
+
+                    if (overlap) {
+                        if (!selectedElements.has(media.id)) selectElement(media.id, true);
+                    } else if (!e.shiftKey) {
+                        if (selectedElements.has(media.id)) {
+                            selectedElements.delete(media.id);
+                            el.classList.remove('selected');
+                            updateSelectionUI();
+                        }
+                    }
+                });
+            }
         });
 
         window.addEventListener('mouseup', () => {
             if (isPanning) {
                 isPanning = false;
-                workspace.style.cursor = 'auto';
+                if (!isSpacePressed) workspace.style.cursor = 'auto';
+            }
+            if (isMarquee) {
+                isMarquee = false;
+                marqueeBox.style.display = 'none';
             }
         });
 
@@ -1680,7 +2115,7 @@
 
                     mediaState[id].scaleX = sx;
                     mediaState[id].scaleY = sy;
-                    draggable.style.transform = `scale(${sx}, ${sy})`;
+                    applyTransform(id);
 
                     // Envia para o OBS
                     socket.emit('media:scale_sync', { id: id, scaleX: sx, scaleY: sy });
@@ -1858,8 +2293,11 @@
                 delete mediaState[data.id];
                 const el = document.getElementById(`admin-${data.id}`);
                 if (el) {
-                    if (selectedElementId === data.id) clearSelection();
-                    if (activeDragElement && activeDragElement.id === data.id) activeDragElement = null;
+                    if (selectedElements.has(data.id)) {
+                        selectedElements.delete(data.id);
+                        updateSelectionUI();
+                    }
+                    activeDragElements = activeDragElements.filter(d => d.id !== data.id);
                     if (activeResizeElement && activeResizeElement.id === data.id) activeResizeElement = null;
                     el.remove();
                 }
@@ -1873,7 +2311,7 @@
                 if (el) {
                     const video = el.querySelector('video');
                     if (video) video.muted = data.muted;
-                    if (selectedElementId === data.id && btnCtxMute) btnCtxMute.innerText = data.muted ? '🔇 Mudo' : '🔊 Áudio';
+                    if (selectedElements.has(data.id) && selectedElements.size === 1 && btnCtxMute) btnCtxMute.innerText = data.muted ? '🔇 Mudo' : '🔊 Áudio';
                 }
             }
         });
@@ -1912,16 +2350,14 @@
                     const contentEl = el.querySelector('.media-content');
                     if (contentEl) contentEl.style.opacity = data.opacity;
                 }
-                if (selectedElementId === data.id && ctxOpacity) {
+                if (selectedElements.has(data.id) && selectedElements.size === 1 && ctxOpacity) {
                     ctxOpacity.value = data.opacity;
                 }
             }
         });
 
         // Lógica de Drag & Drop da Mídia
-        let activeDragElement = null;
-        let dragOffsetX = 0;
-        let dragOffsetY = 0;
+        let activeDragElements = [];
 
         // Lógica de Redimensionamento pelas bordas
         let activeResizeElement = null;
@@ -1932,6 +2368,17 @@
         let resizeBaseWidth = 0;
         let resizeBaseHeight = 0;
         
+        let activeCropElement = null;
+
+        let activeRotateElement = null;
+        let rotateStartAngle = 0;
+        let rotateStartRotation = 0;
+        let rotateCenterX = 0;
+        let rotateCenterY = 0;
+        
+        let resizeStartMediaX = 0;
+        let resizeStartMediaY = 0;
+
         let lastMouseMoveEmitTime = 0;
 
         function createDraggableElement(data, startX, startY) {
@@ -1946,7 +2393,8 @@
             
             const sx = data.scaleX !== undefined ? data.scaleX : (data.scale || 1);
             const sy = data.scaleY !== undefined ? data.scaleY : (data.scale || 1);
-            container.style.transform = `scale(${sx}, ${sy})`;
+            const rot = data.rotation || 0;
+            container.style.transform = `rotate(${rot}deg) scale(${sx}, ${sy})`;
             
             if (!data.visible) container.classList.add('hidden-media');
 
@@ -1984,6 +2432,7 @@
                 mediaEl.addEventListener('input', () => {
                     data.text = mediaEl.innerText;
                     socket.emit('media:update_text', { id: data.id, text: mediaEl.innerText });
+                    applyTransform(data.id);
                 });
 
                 mediaEl.addEventListener('blur', () => {
@@ -2026,8 +2475,65 @@
                 mediaEl.style.opacity = data.opacity;
             }
 
-            container.appendChild(mediaEl);
+            const cropWrapper = document.createElement('div');
+            cropWrapper.classList.add('media-crop-wrapper');
+            cropWrapper.style.overflow = 'hidden';
+            cropWrapper.style.position = 'relative';
+
+            cropWrapper.appendChild(mediaEl);
+            container.appendChild(cropWrapper);
             virtualCanvas.appendChild(container);
+
+            // Interface de Corte (Crop UI)
+            const cropUI = document.createElement('div');
+            cropUI.className = 'crop-ui';
+            cropUI.innerHTML = `
+                <div class="crop-edge crop-t" data-edge="t"></div>
+                <div class="crop-edge crop-r" data-edge="r"></div>
+                <div class="crop-edge crop-b" data-edge="b"></div>
+                <div class="crop-edge crop-l" data-edge="l"></div>
+                <div class="crop-edge crop-tl" data-edge="tl"></div>
+                <div class="crop-edge crop-tr" data-edge="tr"></div>
+                <div class="crop-edge crop-bl" data-edge="bl"></div>
+                <div class="crop-edge crop-br" data-edge="br"></div>
+            `;
+            
+            cropUI.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('crop-edge')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    selectElement(data.id);
+                    activeCropElement = { element: container, id: data.id, edge: e.target.getAttribute('data-edge') };
+                    resizeStartMouseX = e.clientX;
+                    resizeStartMouseY = e.clientY;
+                    resizeStartScaleX = mediaState[data.id].scaleX !== undefined ? mediaState[data.id].scaleX : (mediaState[data.id].scale || 1);
+                    resizeStartScaleY = mediaState[data.id].scaleY !== undefined ? mediaState[data.id].scaleY : (mediaState[data.id].scale || 1);
+                    
+                    const crop = mediaState[data.id].crop || { t: 0, r: 0, b: 0, l: 0 };
+                    let uiT = Math.round(crop.t), uiR = Math.round(crop.r), uiB = Math.round(crop.b), uiL = Math.round(crop.l);
+                    if (mediaState[data.id].flipX) { uiL = Math.round(crop.r); uiR = Math.round(crop.l); }
+                    if (mediaState[data.id].flipY) { uiT = Math.round(crop.b); uiB = Math.round(crop.t); }
+                    
+                    resizeStartCropT = uiT; resizeStartCropR = uiR; resizeStartCropB = uiB; resizeStartCropL = uiL;
+                    resizeStartMediaX = mediaState[data.id].x;
+                    resizeStartMediaY = mediaState[data.id].y;
+
+                    const contentEl = container.querySelector('.media-content');
+                    resizeBaseWidth = contentEl ? contentEl.offsetWidth : 100;
+                    resizeBaseHeight = contentEl ? contentEl.offsetHeight : 100;
+                }
+            });
+            container.appendChild(cropUI);
+
+            // Aplica espelhamentos, rotação e cortes que já vêm do servidor
+            applyTransform(data.id);
+            
+            if (mediaEl.tagName === 'IMG') {
+                mediaEl.onload = () => { applyTransform(data.id); updateSelectionUI(); };
+            } else if (mediaEl.tagName === 'VIDEO') {
+                mediaEl.onloadedmetadata = () => { applyTransform(data.id); updateSelectionUI(); };
+            }
 
             // Eventos do mouse para arrastar a imagem
             container.addEventListener('mousedown', (e) => {
@@ -2038,26 +2544,58 @@
                     document.activeElement.blur();
                 }
 
-                selectElement(data.id);
+                // Encontra todas as mídias (draggables) exatamente embaixo de onde o mouse clicou
+                const elementsUnderMouse = document.elementsFromPoint(e.clientX, e.clientY)
+                    .map(el => el.closest('.draggable'))
+                    .filter(el => el != null)
+                    .map(el => el.id.replace('admin-', ''));
 
-                activeDragElement = {
-                    element: container,
-                    id: data.id
-                };
-                
-                // Em vez de usar offsetX, calculamos a posição do mouse relativa à posição top/left real da div escalonada.
-                // A posição left e top representam o canto superior esquerdo (mesmo escalonado, pois transform-origin é top left).
-                const rect = virtualCanvas.getBoundingClientRect();
-                
-                // mouseX no mundo não-escalonado do virtual-canvas
-                const mouseX_inCanvas = (e.clientX - rect.left) / currentScale;
-                const mouseY_inCanvas = (e.clientY - rect.top) / currentScale;
-                
-                const elementLeft = parseFloat(container.style.left);
-                const elementTop = parseFloat(container.style.top);
+                const uniqueIds = [...new Set(elementsUnderMouse)];
+                let targetId = data.id; // Fallback de segurança
 
-                dragOffsetX = mouseX_inCanvas - elementLeft;
-                dragOffsetY = mouseY_inCanvas - elementTop;
+                // Lógica de Revezamento: Se há várias mídias sobrepostas e não estamos segurando Shift
+                if (uniqueIds.length > 1 && !e.shiftKey) {
+                    const currentlySelectedIndex = uniqueIds.findIndex(id => selectedElements.has(id) && selectedElements.size === 1);
+                    if (currentlySelectedIndex !== -1) {
+                        const nextIndex = (currentlySelectedIndex + 1) % uniqueIds.length;
+                        targetId = uniqueIds[nextIndex];
+                    } else {
+                        targetId = uniqueIds[0];
+                    }
+                } else if (uniqueIds.length > 0) {
+                    targetId = uniqueIds[0];
+                }
+
+                if (e.shiftKey) {
+                    if (selectedElements.has(targetId)) {
+                        selectedElements.delete(targetId);
+                        const elToRemove = document.getElementById(`admin-${targetId}`);
+                        if (elToRemove) elToRemove.classList.remove('selected');
+                        updateSelectionUI();
+                        return;
+                    } else {
+                        selectElement(targetId, true);
+                    }
+                } else {
+                    if (!selectedElements.has(targetId)) {
+                        selectElement(targetId, false);
+                    }
+                }
+
+                activeDragElements = [];
+                selectedElements.forEach(id => {
+                    const el = document.getElementById(`admin-${id}`);
+                    if (!el) return;
+                    const rect = virtualCanvas.getBoundingClientRect();
+                    const mouseX_inCanvas = (e.clientX - rect.left) / currentScale;
+                    const mouseY_inCanvas = (e.clientY - rect.top) / currentScale;
+                    const elementLeft = parseFloat(el.style.left) || 0;
+                    const elementTop = parseFloat(el.style.top) || 0;
+                    activeDragElements.push({
+                        id: id, element: el, offsetX: mouseX_inCanvas - elementLeft, offsetY: mouseY_inCanvas - elementTop
+                    });
+                });
+                e.stopPropagation();
             });
         }
 
@@ -2083,6 +2621,109 @@
                 lastMouseMoveEmitTime = now;
             }
 
+            if (activeRotateElement && !isPanning) {
+                const angle = Math.atan2(e.clientY - rotateCenterY, e.clientX - rotateCenterX);
+                let angleDiff = (angle - rotateStartAngle) * 180 / Math.PI;
+                
+                let newRotation = rotateStartRotation + angleDiff;
+                if (e.shiftKey) {
+                    newRotation = Math.round(newRotation / 45) * 45;
+                }
+                
+                setRotationAroundCenter(activeRotateElement.id, newRotation, rotateStartMediaX, rotateStartMediaY, rotateStartRotation);
+                applyTransform(activeRotateElement.id);
+                
+                const container = activeRotateElement.element;
+                if (container) {
+                    container.style.left = (mediaState[activeRotateElement.id].x + canvasPadding) + 'px';
+                    container.style.top = (mediaState[activeRotateElement.id].y + canvasPadding) + 'px';
+                }
+
+                transformSyncData = {
+                    id: activeRotateElement.id,
+                    rotation: newRotation,
+                    flipX: mediaState[activeRotateElement.id].flipX,
+                    flipY: mediaState[activeRotateElement.id].flipY,
+                    x: mediaState[activeRotateElement.id].x,
+                    y: mediaState[activeRotateElement.id].y
+                };
+                pendingTransformSync = true;
+                
+                dragSyncDataMap[activeRotateElement.id] = {
+                    id: activeRotateElement.id,
+                    x: mediaState[activeRotateElement.id].x,
+                    y: mediaState[activeRotateElement.id].y
+                };
+                pendingDragSync = true;
+                return;
+            }
+
+            if (activeCropElement && !isPanning) {
+                const dx = e.clientX - resizeStartMouseX;
+                const dy = e.clientY - resizeStartMouseY;
+                
+                const canvasDx = dx / currentScale;
+                const canvasDy = dy / currentScale;
+
+                const rot = mediaState[activeCropElement.id].rotation || 0;
+                const rad = -rot * Math.PI / 180;
+                
+                const unrotatedDx = canvasDx * Math.cos(rad) - canvasDy * Math.sin(rad);
+                const unrotatedDy = canvasDx * Math.sin(rad) + canvasDy * Math.cos(rad);
+
+                const unscaledDx = unrotatedDx / resizeStartScaleX;
+                const unscaledDy = unrotatedDy / resizeStartScaleY;
+
+                let newUiT = resizeStartCropT; let newUiR = resizeStartCropR;
+                let newUiB = resizeStartCropB; let newUiL = resizeStartCropL;
+
+                if (activeCropElement.edge.includes('t')) newUiT += unscaledDy;
+                if (activeCropElement.edge.includes('b')) newUiB -= unscaledDy;
+                if (activeCropElement.edge.includes('l')) newUiL += unscaledDx;
+                if (activeCropElement.edge.includes('r')) newUiR -= unscaledDx;
+
+                newUiT = Math.max(0, Math.min(newUiT, resizeBaseHeight - newUiB - 10));
+                newUiB = Math.max(0, Math.min(newUiB, resizeBaseHeight - newUiT - 10));
+                newUiL = Math.max(0, Math.min(newUiL, resizeBaseWidth - newUiR - 10));
+                newUiR = Math.max(0, Math.min(newUiR, resizeBaseWidth - newUiL - 10));
+
+                let newCrop = { t: newUiT, r: newUiR, b: newUiB, l: newUiL };
+                
+                if (mediaState[activeCropElement.id].flipX) { newCrop.l = newUiR; newCrop.r = newUiL; }
+                if (mediaState[activeCropElement.id].flipY) { newCrop.t = newUiB; newCrop.b = newUiT; }
+
+                mediaState[activeCropElement.id].crop = newCrop;
+
+                const deltaUiL = newUiL - resizeStartCropL;
+                const deltaUiT = newUiT - resizeStartCropT;
+
+                const shiftX_unrotated = deltaUiL * resizeStartScaleX;
+                const shiftY_unrotated = deltaUiT * resizeStartScaleY;
+
+                const radPos = rot * Math.PI / 180;
+                const shiftX_screen = shiftX_unrotated * Math.cos(radPos) - shiftY_unrotated * Math.sin(radPos);
+                const shiftY_screen = shiftX_unrotated * Math.sin(radPos) + shiftY_unrotated * Math.cos(radPos);
+
+                mediaState[activeCropElement.id].x = Math.round(resizeStartMediaX + shiftX_screen);
+                mediaState[activeCropElement.id].y = Math.round(resizeStartMediaY + shiftY_screen);
+
+                applyTransform(activeCropElement.id);
+
+                const container = activeCropElement.element;
+                if (container) {
+                    container.style.left = (mediaState[activeCropElement.id].x + canvasPadding) + 'px';
+                    container.style.top = (mediaState[activeCropElement.id].y + canvasPadding) + 'px';
+                }
+
+                cropSyncDataMap[activeCropElement.id] = { id: activeCropElement.id, crop: newCrop };
+                pendingCropSync = true;
+
+                dragSyncDataMap[activeCropElement.id] = { id: activeCropElement.id, x: mediaState[activeCropElement.id].x, y: mediaState[activeCropElement.id].y };
+                pendingDragSync = true;
+
+                return;
+            }
+
             if (activeResizeElement && !isPanning) {
                 const dx = e.clientX - resizeStartMouseX;
                 const dy = e.clientY - resizeStartMouseY;
@@ -2091,35 +2732,14 @@
                 const canvasDx = dx / currentScale;
                 const canvasDy = dy / currentScale;
 
-                if (activeResizeElement.isAltKey) {
-                    const rot = mediaState[activeResizeElement.id].rotation || 0;
-                    const rad = -rot * Math.PI / 180;
-                    
-                    const unrotatedDx = canvasDx * Math.cos(rad) - canvasDy * Math.sin(rad);
-                    const unrotatedDy = canvasDx * Math.sin(rad) + canvasDy * Math.cos(rad);
-                    
-                    const unscaledDx = unrotatedDx / resizeStartScaleX;
-                    const unscaledDy = unrotatedDy / resizeStartScaleY;
+                const rot = mediaState[activeResizeElement.id].rotation || 0;
+                const rad = -rot * Math.PI / 180;
+                
+                const unrotatedDx = canvasDx * Math.cos(rad) - canvasDy * Math.sin(rad);
+                const unrotatedDy = canvasDx * Math.sin(rad) + canvasDy * Math.cos(rad);
 
-                    let newCropR = resizeStartCropR - unscaledDx;
-                    let newCropB = resizeStartCropB - unscaledDy;
-
-                    newCropR = Math.max(0, Math.min(newCropR, resizeBaseWidth - resizeStartCropL - 10)); 
-                    newCropB = Math.max(0, Math.min(newCropB, resizeBaseHeight - resizeStartCropT - 10));
-
-                    if (!mediaState[activeResizeElement.id].crop) {
-                        mediaState[activeResizeElement.id].crop = { t: 0, r: 0, b: 0, l: 0 };
-                    }
-                    mediaState[activeResizeElement.id].crop.r = newCropR;
-                    mediaState[activeResizeElement.id].crop.b = newCropB;
-
-                    applyTransform(activeResizeElement.id);
-                    socket.emit('media:crop_sync', { id: activeResizeElement.id, crop: mediaState[activeResizeElement.id].crop });
-                    return;
-                }
-
-                let newSx = resizeStartScaleX + (canvasDx / resizeBaseWidth);
-                let newSy = resizeStartScaleY + (canvasDy / resizeBaseHeight);
+                let newSx = resizeStartScaleX + (unrotatedDx / resizeBaseWidth);
+                let newSy = resizeStartScaleY + (unrotatedDy / resizeBaseHeight);
 
                 // Travar proporção se segurar Shift
                 if (e.shiftKey) {
@@ -2135,128 +2755,142 @@
                 mediaState[activeResizeElement.id].scaleX = newSx;
                 mediaState[activeResizeElement.id].scaleY = newSy;
                 
-                activeResizeElement.element.style.transform = `scale(${newSx}, ${newSy})`;
+                applyTransform(activeResizeElement.id);
 
                 scaleSyncData = { id: activeResizeElement.id, scaleX: newSx, scaleY: newSy };
                 pendingScaleSync = true;
                 return; // Pula o código de arrastar a imagem
             }
 
-            if (activeDragElement && !isPanning) {
+            if (activeDragElements && activeDragElements.length > 0 && !isPanning) {
                 const rect = virtualCanvas.getBoundingClientRect();
                 
-                // Transforma as coordenadas da tela real do mouse nas coordenadas "brutas" do virtual-canvas
                 const mouseX_inCanvas = (e.clientX - rect.left) / currentScale;
                 const mouseY_inCanvas = (e.clientY - rect.top) / currentScale;
 
-                // Aplica o offset de onde o usuário "pegou" na imagem
-                const newLeft = mouseX_inCanvas - dragOffsetX;
-                const newTop = mouseY_inCanvas - dragOffsetY;
-
-                activeDragElement.element.style.left = newLeft + 'px';
-                activeDragElement.element.style.top = newTop + 'px';
-
-                const newMediaX = Math.round(newLeft - canvasPadding);
-                const newMediaY = Math.round(newTop - canvasPadding);
-                
-                if (mediaState[activeDragElement.id]) {
-                    mediaState[activeDragElement.id].x = newMediaX;
-                    mediaState[activeDragElement.id].y = newMediaY;
-                }
-
-                dragSyncData = {
-                    id: activeDragElement.id,
-                    x: newMediaX,
-                    y: newMediaY
-                };
+                activeDragElements.forEach(dragData => {
+                    const newLeft = mouseX_inCanvas - dragData.offsetX;
+                    const newTop = mouseY_inCanvas - dragData.offsetY;
+                    
+                    dragData.element.style.left = newLeft + 'px';
+                    dragData.element.style.top = newTop + 'px';
+                    
+                    const newMediaX = Math.round(newLeft - canvasPadding);
+                    const newMediaY = Math.round(newTop - canvasPadding);
+                    
+                    if (mediaState[dragData.id]) {
+                        mediaState[dragData.id].x = newMediaX;
+                        mediaState[dragData.id].y = newMediaY;
+                    }
+                    dragSyncDataMap[dragData.id] = { id: dragData.id, x: newMediaX, y: newMediaY };
+                });
                 pendingDragSync = true;
             }
         });
 
         window.addEventListener('mouseup', () => {
-            activeDragElement = null;
+            activeDragElements = [];
             activeResizeElement = null;
+            activeRotateElement = null;
+            activeCropElement = null;
         });
         
         window.addEventListener('mouseleave', () => {
-            activeDragElement = null;
+            activeDragElements = [];
             activeResizeElement = null;
+            activeRotateElement = null;
+            activeCropElement = null;
         });
 
          // ============================================
         // EVENTOS DA NOVA BARRA GLOBAL E RESIZE
         // ============================================
         btnCtxLayerUp.addEventListener('click', () => {
-            if (!selectedElementId) return;
-            const id = selectedElementId;
+            if (selectedElements.size === 0) return;
             let maxOtherZ = -Infinity;
             for (let key in mediaState) {
-                if (key !== id) {
+                if (!selectedElements.has(key)) {
                     let otherZ = mediaState[key].zIndex !== undefined ? mediaState[key].zIndex : 10;
                     if (otherZ > maxOtherZ) maxOtherZ = otherZ;
                 }
             }
-            let currentZ = mediaState[id].zIndex !== undefined ? mediaState[id].zIndex : 10;
-            if (maxOtherZ !== -Infinity && currentZ <= maxOtherZ) {
-                let z = maxOtherZ + 1;
-                mediaState[id].zIndex = z;
+            if (maxOtherZ === -Infinity) maxOtherZ = 10;
+            
+            let sortedSelected = Array.from(selectedElements).sort((a,b) => (mediaState[a].zIndex || 10) - (mediaState[b].zIndex || 10));
+            let startZ = maxOtherZ + 1;
+            sortedSelected.forEach(id => {
+                mediaState[id].zIndex = startZ;
                 const container = document.getElementById(`admin-${id}`);
-                if (container) container.style.zIndex = z;
-                socket.emit('media:layer_sync', { id: id, zIndex: z });
-            }
+                if (container) container.style.zIndex = startZ;
+                socket.emit('media:layer_sync', { id: id, zIndex: startZ });
+                startZ++;
+            });
         });
 
         btnCtxLayerDown.addEventListener('click', () => {
-            if (!selectedElementId) return;
-            const id = selectedElementId;
+            if (selectedElements.size === 0) return;
             let minOtherZ = Infinity;
             for (let key in mediaState) {
-                if (key !== id) {
+                if (!selectedElements.has(key)) {
                     let otherZ = mediaState[key].zIndex !== undefined ? mediaState[key].zIndex : 10;
                     if (otherZ < minOtherZ) minOtherZ = otherZ;
                 }
             }
-            let currentZ = mediaState[id].zIndex !== undefined ? mediaState[id].zIndex : 10;
-            if (minOtherZ !== Infinity && currentZ >= minOtherZ) {
-                let z = minOtherZ - 1;
-                mediaState[id].zIndex = z;
+            if (minOtherZ === Infinity) minOtherZ = 10;
+            
+            let sortedSelected = Array.from(selectedElements).sort((a,b) => (mediaState[b].zIndex || 10) - (mediaState[a].zIndex || 10));
+            let startZ = minOtherZ - 1;
+            sortedSelected.forEach(id => {
+                mediaState[id].zIndex = startZ;
                 const container = document.getElementById(`admin-${id}`);
-                if (container) container.style.zIndex = z;
-                socket.emit('media:layer_sync', { id: id, zIndex: z });
-            }
+                if (container) container.style.zIndex = startZ;
+                socket.emit('media:layer_sync', { id: id, zIndex: startZ });
+                startZ--;
+            });
         });
 
         btnCtxHide.addEventListener('click', () => {
-            if (!selectedElementId) return;
-            const id = selectedElementId;
-            const media = mediaState[id];
-            media.visible = !media.visible;
-            const container = document.getElementById(`admin-${id}`);
-            if (container) {
-                if (media.visible) {
-                    container.classList.remove('hidden-media');
-                    btnCtxHide.innerText = '👁️ Ocultar';
-                } else {
-                    container.classList.add('hidden-media');
-                    btnCtxHide.innerText = '🙈 Mostrar';
+            if (selectedElements.size === 0) return;
+            let anyVisible = false;
+            selectedElements.forEach(id => { if(mediaState[id].visible) anyVisible = true; });
+            const newState = !anyVisible;
+            selectedElements.forEach(id => {
+                mediaState[id].visible = newState;
+                const container = document.getElementById(`admin-${id}`);
+                if (container) {
+                    if (newState) container.classList.remove('hidden-media');
+                    else container.classList.add('hidden-media');
                 }
-            }
-            socket.emit('media:toggle_visibility', { id: id, visible: media.visible });
+                socket.emit('media:toggle_visibility', { id: id, visible: newState });
+            });
+            if (selectedElements.size === 1) btnCtxHide.innerText = newState ? '👁️ Ocultar' : '🙈 Mostrar';
         });
 
         btnCtxRotate.addEventListener('click', () => {
-            if (!selectedElementId) return;
-            const id = selectedElementId;
+            if (selectedElements.size !== 1) return;
+            const id = Array.from(selectedElements)[0];
             if (!mediaState[id]) return;
-            mediaState[id].rotation = (mediaState[id].rotation || 0) + 90;
-            if (mediaState[id].rotation >= 360) mediaState[id].rotation = 0;
+            
+            const oldRot = mediaState[id].rotation || 0;
+            setRotationAroundCenter(id, oldRot + 90);
             applyTransform(id);
+            
+            const container = document.getElementById(`admin-${id}`);
+            if (container) {
+                container.style.left = (mediaState[id].x + canvasPadding) + 'px';
+                container.style.top = (mediaState[id].y + canvasPadding) + 'px';
+            }
             socket.emit('media:transform_sync', { id: id, rotation: mediaState[id].rotation, flipX: mediaState[id].flipX, flipY: mediaState[id].flipY });
+            socket.emit('media:drag_sync', { id: id, x: mediaState[id].x, y: mediaState[id].y });
+        });
+
+        btnCtxDuplicate.addEventListener('click', () => {
+            duplicateSelectedMedia();
         });
 
         btnCtxFlipH.addEventListener('click', () => {
-            if (!selectedElementId) return;
-            const id = selectedElementId;
+            if (selectedElements.size !== 1) return;
+            const id = Array.from(selectedElements)[0];
             if (!mediaState[id]) return;
             mediaState[id].flipX = !mediaState[id].flipX;
             applyTransform(id);
@@ -2264,8 +2898,8 @@
         });
 
         btnCtxFlipV.addEventListener('click', () => {
-            if (!selectedElementId) return;
-            const id = selectedElementId;
+            if (selectedElements.size !== 1) return;
+            const id = Array.from(selectedElements)[0];
             if (!mediaState[id]) return;
             mediaState[id].flipY = !mediaState[id].flipY;
             applyTransform(id);
@@ -2273,54 +2907,62 @@
         });
 
         btnCtxDelete.addEventListener('click', () => {
-            if (!selectedElementId) return;
-            const id = selectedElementId;
-            const container = document.getElementById(`admin-${id}`);
-            if (container) container.remove();
-            delete mediaState[id];
-            socket.emit('media:delete', { id: id });
+            if (selectedElements.size === 0) return;
+            selectedElements.forEach(id => {
+                const container = document.getElementById(`admin-${id}`);
+                if (container) container.remove();
+                delete mediaState[id];
+                socket.emit('media:delete', { id: id });
+            });
             clearSelection();
         });
 
         btnCtxMute.addEventListener('click', () => {
-            if (!selectedElementId) return;
-            const id = selectedElementId;
-            const media = mediaState[id];
-            const container = document.getElementById(`admin-${id}`);
-            const video = container ? container.querySelector('video') : null;
-            if (video) {
-                video.muted = !video.muted;
-                media.muted = video.muted;
-                btnCtxMute.innerText = video.muted ? '🔇 Mudo' : '🔊 Áudio';
-                socket.emit('media:video_mute', { id: id, muted: video.muted });
-            }
+            if (selectedElements.size === 0) return;
+            let firstId = Array.from(selectedElements)[0];
+            const firstVideo = document.getElementById(`admin-${firstId}`)?.querySelector('video');
+            if (!firstVideo) return;
+            const newState = !firstVideo.muted;
+            selectedElements.forEach(id => {
+                const container = document.getElementById(`admin-${id}`);
+                const video = container ? container.querySelector('video') : null;
+                if (video) {
+                    video.muted = newState;
+                    if(mediaState[id]) mediaState[id].muted = newState;
+                    socket.emit('media:video_mute', { id: id, muted: newState });
+                }
+            });
+            btnCtxMute.innerText = newState ? '🔇 Mudo' : '🔊 Áudio';
         });
 
         ctxVideoSeek.addEventListener('input', () => {
-            if (!selectedElementId) return;
-            const id = selectedElementId;
-            const container = document.getElementById(`admin-${id}`);
-            const video = container ? container.querySelector('video') : null;
-            if (video && video.duration) {
-                const time = (ctxVideoSeek.value / 100) * video.duration;
-                video.currentTime = time;
-                socket.emit('media:video_seek', { id: id, currentTime: time });
-            }
+            if (selectedElements.size === 0) return;
+            const val = ctxVideoSeek.value;
+            selectedElements.forEach(id => {
+                const container = document.getElementById(`admin-${id}`);
+                const video = container ? container.querySelector('video') : null;
+                if (video && video.duration) {
+                    const time = (val / 100) * video.duration;
+                    video.currentTime = time;
+                    socket.emit('media:video_seek', { id: id, currentTime: time });
+                }
+            });
         });
 
         ctxOpacity.addEventListener('input', () => {
-            if (!selectedElementId) return;
-            const id = selectedElementId;
+            if (selectedElements.size === 0) return;
             const val = parseFloat(ctxOpacity.value);
-            if (mediaState[id]) {
-                mediaState[id].opacity = val;
-            }
-            const container = document.getElementById(`admin-${id}`);
-            if (container) {
-                const contentEl = container.querySelector('.media-content');
-                if (contentEl) contentEl.style.opacity = val;
-            }
-            socket.emit('media:opacity_sync', { id: id, opacity: val });
+            selectedElements.forEach(id => {
+                if (mediaState[id]) {
+                    mediaState[id].opacity = val;
+                }
+                const container = document.getElementById(`admin-${id}`);
+                if (container) {
+                    const contentEl = container.querySelector('.media-content');
+                    if (contentEl) contentEl.style.opacity = val;
+                }
+                socket.emit('media:opacity_sync', { id: id, opacity: val });
+            });
         });
 
         let resizeStartCropT = 0;
@@ -2329,14 +2971,14 @@
         let resizeStartCropL = 0;
 
         globalResizeHandle.addEventListener('mousedown', (e) => {
-            if (!selectedElementId) return;
+            if (selectedElements.size !== 1) return;
             e.stopPropagation();
             e.preventDefault();
             
-            const id = selectedElementId;
+            const id = Array.from(selectedElements)[0];
             const container = document.getElementById(`admin-${id}`);
 
-            activeResizeElement = { element: container, id: id, isAltKey: e.altKey };
+            activeResizeElement = { element: container, id: id };
 
             resizeStartMouseX = e.clientX;
             resizeStartMouseY = e.clientY;
@@ -2344,18 +2986,66 @@
             resizeStartScaleX = mediaState[id].scaleX !== undefined ? mediaState[id].scaleX : (mediaState[id].scale || 1);
             resizeStartScaleY = mediaState[id].scaleY !== undefined ? mediaState[id].scaleY : (mediaState[id].scale || 1);
             
-            const crop = mediaState[id].crop || { t: 0, r: 0, b: 0, l: 0 };
-            mediaState[id].crop = crop;
-            resizeStartCropT = crop.t;
-            resizeStartCropR = crop.r;
-            resizeStartCropB = crop.b;
-            resizeStartCropL = crop.l;
 
             const contentEl = container.querySelector('.media-content');
-            resizeBaseWidth = contentEl ? contentEl.offsetWidth : 100;
-            resizeBaseHeight = contentEl ? contentEl.offsetHeight : 100;
+            const baseWidth = contentEl ? contentEl.offsetWidth : 100;
+            const baseHeight = contentEl ? contentEl.offsetHeight : 100;
+            
+            const crop = mediaState[id].crop || { t: 0, r: 0, b: 0, l: 0 };
+            let uiT = Math.round(crop.t), uiR = Math.round(crop.r), uiB = Math.round(crop.b), uiL = Math.round(crop.l);
+            if (mediaState[id].flipX) { uiL = Math.round(crop.r); uiR = Math.round(crop.l); }
+            if (mediaState[id].flipY) { uiT = Math.round(crop.b); uiB = Math.round(crop.t); }
+            
+            resizeBaseWidth = Math.max(1, Math.round(baseWidth) - uiL - uiR);
+            resizeBaseHeight = Math.max(1, Math.round(baseHeight) - uiT - uiB);
         });
         
+        globalRotateHandle.addEventListener('mousedown', (e) => {
+            if (selectedElements.size !== 1) return;
+            e.stopPropagation();
+            e.preventDefault();
+            
+            const id = Array.from(selectedElements)[0];
+            const container = document.getElementById(`admin-${id}`);
+            const media = mediaState[id];
+
+            activeRotateElement = { element: container, id: id };
+            rotateStartRotation = media.rotation || 0;
+
+            const sx = media.scaleX !== undefined ? media.scaleX : (media.scale || 1);
+            const sy = media.scaleY !== undefined ? media.scaleY : (media.scale || 1);
+            const contentEl = container.querySelector('.media-content');
+            const baseWidth = contentEl ? contentEl.offsetWidth : 100;
+            const baseHeight = contentEl ? contentEl.offsetHeight : 100;
+            
+            const crop = media.crop || { t: 0, r: 0, b: 0, l: 0 };
+            let uiT = Math.round(crop.t), uiR = Math.round(crop.r), uiB = Math.round(crop.b), uiL = Math.round(crop.l);
+            if (media.flipX) { uiL = Math.round(crop.r); uiR = Math.round(crop.l); }
+            if (media.flipY) { uiT = Math.round(crop.b); uiB = Math.round(crop.t); }
+
+            const visibleWidth = Math.max(1, Math.round(baseWidth) - uiL - uiR);
+            const visibleHeight = Math.max(1, Math.round(baseHeight) - uiT - uiB);
+
+            const unscaledCenterX = visibleWidth / 2;
+            const unscaledCenterY = visibleHeight / 2;
+            const scaledCenterX = unscaledCenterX * sx;
+            const scaledCenterY = unscaledCenterY * sy;
+            
+            const rad = rotateStartRotation * Math.PI / 180;
+            const cx = scaledCenterX * Math.cos(rad) - scaledCenterY * Math.sin(rad);
+            const cy = scaledCenterX * Math.sin(rad) + scaledCenterY * Math.cos(rad);
+
+            const leftPos = (media.x + canvasPadding) * currentScale;
+            const topPos = (media.y + canvasPadding) * currentScale;
+
+            const rect = virtualCanvas.getBoundingClientRect();
+            
+            rotateCenterX = rect.left + leftPos + cx * currentScale;
+            rotateCenterY = rect.top + topPos + cy * currentScale;
+
+            rotateStartAngle = Math.atan2(e.clientY - rotateCenterY, e.clientX - rotateCenterX);
+        });
+
         // ============================================
         // CURSORES DOS OUTROS ADMINS
         // ============================================
