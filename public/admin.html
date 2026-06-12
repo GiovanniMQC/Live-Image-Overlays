@@ -1786,7 +1786,8 @@
                                 x: media.x,
                                 y: media.y,
                                 scaleX: media.scaleX !== undefined ? media.scaleX : (media.scale || 1),
-                                scaleY: media.scaleY !== undefined ? media.scaleY : (media.scale || 1)
+                                scaleY: media.scaleY !== undefined ? media.scaleY : (media.scale || 1),
+                                rotation: media.rotation || 0
                             };
 
                             // Calcula a escala necessária
@@ -1801,6 +1802,7 @@
                             media.y = 0;
                             media.scaleX = newScaleX;
                             media.scaleY = newScaleY;
+                            media.rotation = 0;
                             media.isFullScreen = true;
                         } else {
                             // Restaura estado anterior
@@ -1809,6 +1811,7 @@
                                 media.y = media.savedState.y;
                                 media.scaleX = media.savedState.scaleX;
                                 media.scaleY = media.savedState.scaleY;
+                                media.rotation = media.savedState.rotation || 0;
                             }
                             media.isFullScreen = false;
                         }
@@ -1821,6 +1824,7 @@
                         // Emite pro servidor/OBS
                         socket.emit('media:drag_sync', { id: id, x: media.x, y: media.y });
                         socket.emit('media:scale_sync', { id: id, scaleX: media.scaleX, scaleY: media.scaleY });
+                        socket.emit('media:transform_sync', { id: id, rotation: media.rotation, flipX: media.flipX, flipY: media.flipY });
                     }
                 });
             }
@@ -2692,6 +2696,7 @@
                 }
                 
                 setRotationAroundCenter(activeRotateElement.id, newRotation, rotateStartMediaX, rotateStartMediaY, rotateStartRotation);
+                mediaState[activeRotateElement.id].isFullScreen = false;
                 applyTransform(activeRotateElement.id);
                 
                 const container = activeRotateElement.element;
@@ -2767,6 +2772,7 @@
 
                 mediaState[activeCropElement.id].x = Math.round(resizeStartMediaX + shiftX_screen);
                 mediaState[activeCropElement.id].y = Math.round(resizeStartMediaY + shiftY_screen);
+                mediaState[activeCropElement.id].isFullScreen = false;
 
                 applyTransform(activeCropElement.id);
 
@@ -2815,6 +2821,7 @@
 
                 mediaState[activeResizeElement.id].scaleX = newSx;
                 mediaState[activeResizeElement.id].scaleY = newSy;
+                mediaState[activeResizeElement.id].isFullScreen = false;
                 
                 applyTransform(activeResizeElement.id);
 
@@ -2842,6 +2849,7 @@
                     if (mediaState[dragData.id]) {
                         mediaState[dragData.id].x = newMediaX;
                         mediaState[dragData.id].y = newMediaY;
+                        mediaState[dragData.id].isFullScreen = false;
                     }
                     dragSyncDataMap[dragData.id] = { id: dragData.id, x: newMediaX, y: newMediaY };
                 });
