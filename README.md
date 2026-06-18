@@ -3,7 +3,7 @@
 Um sistema web interativo para OBS Studio que permite a injeção colaborativa de mídias (áudio, vídeo, imagens e texto) diretamente na transmissão ao vivo, com controle em tempo real por moderadores.
 
 > **⚠️ Nota de Desenvolvimento (Vibe Coding):**
-> Este projeto faz uso intenso de Inteligência Artificial para o desenvolvimento inicial (o famoso *vibe coding*). A ideia principal é colocar um protótipo funcional no ar rapidamente, suprindo algumas lacunas de conhecimento técnico que ainda tenho nesses linguagens. Mais do que apenas criar uma ferramenta para usar nas minhas lives, o objetivo deste projeto é **aprender a usar a IA como uma ferramenta de auxílio real**, enquanto manualmente eu faço a busca de bugs, realizando testes de funções e aprendendo a prototipar novas ideias rapidamente, além de melhorar a UX/UI.
+> Este projeto faz uso intenso de Inteligência Artificial para o desenvolvimento inicial (o famoso *vibe coding*). A ideia principal é colocar um protótipo funcional no ar rapidamente, suprindo algumas lacunas de conhecimento técnico que ainda tenho nessas linguagens. Mais do que apenas criar uma ferramenta para usar nas minhas lives, o objetivo deste projeto é **aprender a usar a IA como uma ferramenta de auxílio real**, enquanto manualmente eu faço a busca de bugs, realizando testes de funções e aprendendo a prototipar novas ideias rapidamente, além de melhorar a UX/UI.
 
 ---
 
