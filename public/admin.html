@@ -476,6 +476,31 @@
         #soundpad-sidebar.open {
             right: 0;
         }
+        #media-sidebar {
+            position: fixed;
+            top: 0;
+            right: -350px;
+            width: 320px;
+            height: 100vh;
+            background: #1e1e1e;
+            border-left: 1px solid #444;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            transition: right 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.05);
+        }
+        #media-sidebar.open {
+            right: 0;
+        }
+        .media-preview-img {
+            width: 100%;
+            height: 60px;
+            object-fit: contain;
+            background: #111;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }
         .soundpad-header {
             padding: 15px;
             border-bottom: 1px solid #333;
@@ -634,6 +659,10 @@
         </div>
 
         <div class="tool-container">
+            <button class="tool-btn" title="Biblioteca de Mídia" onclick="toggleMediaSidebar()">📁</button>
+        </div>
+
+        <div class="tool-container">
             <button class="tool-btn" title="Ajuda e Atalhos" onclick="toggleToolPanel('panel-help', this)">❓</button>
             <div id="panel-help" class="tool-panel">
                 <h3>❓ Atalhos e Ajuda</h3>
@@ -667,6 +696,7 @@
                 <button id="btn-ctx-hide" title="Ocultar/Mostrar">👁️ Ocultar</button>
                 <button id="btn-ctx-mute" class="video-only" title="Mudo/Áudio">🔊 Áudio</button>
                 <input type="range" id="ctx-video-seek" class="video-only" min="0" max="100" value="0">
+                <input type="range" id="ctx-video-volume" class="video-only" min="0" max="1" step="0.01" value="1" title="Volume do Vídeo" style="width: 80px; cursor: pointer;">
                 <input type="range" id="ctx-opacity" min="0" max="1" step="0.01" value="1" title="Opacidade (Transparência)" style="width: 80px; cursor: pointer;">
                 <button id="btn-ctx-delete" class="danger" title="Excluir">🗑️ Excluir</button>
             </div>
@@ -739,6 +769,20 @@
         </div>
     </div>
 
+        <div id="media-sidebar">
+        <div class="soundpad-header">
+            <h2>📁 Biblioteca de Mídia</h2>
+            <button class="btn-close-soundpad" onclick="toggleMediaSidebar()">✖</button>
+        </div>
+        <div class="soundpad-controls">
+            <button id="btn-upload-media-lib" class="btn-upload" style="margin-top: 5px;">📤 Importar Mídia</button>
+            <input type="file" id="media-file-input" accept="image/*,video/*" style="display: none;">
+        </div>
+        <div class="soundpad-grid" id="media-grid">
+            <!-- Botões inseridos via JS -->
+        </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
@@ -779,6 +823,7 @@
         const btnCtxDelete = document.getElementById('btn-ctx-delete');
         const btnCtxMute = document.getElementById('btn-ctx-mute');
         const ctxVideoSeek = document.getElementById('ctx-video-seek');
+        const ctxVideoVolume = document.getElementById('ctx-video-volume');
         const ctxOpacity = document.getElementById('ctx-opacity');
         
         // Novos botões
@@ -1181,6 +1226,199 @@
             document.querySelectorAll('.tool-panel').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
         }
+
+        function toggleMediaSidebar() {
+            document.getElementById('media-sidebar').classList.toggle('open');
+            document.querySelectorAll('.tool-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        }
+
+        let currentMediaList = [];
+
+        function togglePinMedia(id) {
+            const media = currentMediaList.find(m => m.id === id);
+            if (!media) return;
+            const newPinned = !media.pinned;
+            
+            fetch('/api/media-update/' + id, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pinned: newPinned })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    media.pinned = newPinned;
+                    loadMediaUploads(); 
+                }
+            })
+            .catch(e => console.error(e));
+        }
+
+        function createMediaLibButton(mediaObj) {
+            const container = document.createElement('div');
+            container.className = 'sound-btn-container';
+            container.draggable = true;
+            container.dataset.id = mediaObj.id;
+
+            const btn = document.createElement('button');
+            btn.className = 'sound-btn';
+            if (mediaObj.pinned) btn.style.borderColor = 'gold';
+
+            let isVideo = mediaObj.url.match(/\.(mp4|webm|ogg)$/i);
+            
+            if (isVideo) {
+                btn.innerHTML = `<video src="${mediaObj.url}" class="media-preview-img" muted></video><span>${mediaObj.name}</span>`;
+            } else {
+                btn.innerHTML = `<img src="${mediaObj.url}" class="media-preview-img" /><span>${mediaObj.name}</span>`;
+            }
+            
+            // Drag and drop into canvas
+            btn.onclick = () => {
+                const rect = virtualCanvas.getBoundingClientRect();
+                const centerX = (window.innerWidth / 2 - rect.left) / currentScale;
+                const centerY = (window.innerHeight / 2 - rect.top) / currentScale;
+                createMediaFromUrl(mediaObj.url, centerX, centerY);
+            };
+
+            const pinBtn = document.createElement('button');
+            pinBtn.className = 'btn-edit-audio';
+            pinBtn.innerHTML = mediaObj.pinned ? '📌' : '📍';
+            pinBtn.title = mediaObj.pinned ? 'Desafixar' : 'Fixar';
+            pinBtn.onclick = (e) => {
+                e.stopPropagation();
+                togglePinMedia(mediaObj.id);
+            };
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'btn-edit-audio';
+            delBtn.innerHTML = '🗑️';
+            delBtn.title = 'Excluir Mídia';
+            delBtn.style.top = 'auto';
+            delBtn.style.bottom = '5px';
+            delBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (confirm('Tem certeza que deseja excluir a mídia "' + mediaObj.name + '"?')) {
+                    fetch('/api/media-delete/' + mediaObj.id, { method: 'POST' })
+                    .then(res => res.json())
+                    .then(data => { if (data.success) loadMediaUploads(); })
+                    .catch(e => console.error(e));
+                }
+            };
+
+            container.appendChild(btn);
+            container.appendChild(pinBtn);
+            container.appendChild(delBtn);
+            
+            // Drag to reorder inside sidebar
+            container.addEventListener('dragstart', handleMediaDragStart);
+            container.addEventListener('dragenter', handleDragEnter);
+            container.addEventListener('dragover', handleDragOver);
+            container.addEventListener('dragleave', handleDragLeave);
+            container.addEventListener('drop', handleMediaDrop);
+            container.addEventListener('dragend', handleDragEnd);
+
+            return container;
+        }
+        
+        let dragMediaSrcEl = null;
+
+        function handleMediaDragStart(e) {
+            this.style.opacity = '0.4';
+            dragMediaSrcEl = this;
+            e.dataTransfer.effectAllowed = 'move';
+            
+            // Allow dropping to canvas! We pass the URL
+            const mediaObj = currentMediaList.find(m => m.id === this.dataset.id);
+            if (mediaObj) {
+                 e.dataTransfer.setData('URL', mediaObj.url);
+                 e.dataTransfer.setData('text/plain', mediaObj.url);
+            }
+            e.dataTransfer.setData('text/html', this.innerHTML);
+            this.classList.add('dragging');
+        }
+
+        function handleMediaDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            if (!dragMediaSrcEl) return false;
+
+            if (dragMediaSrcEl != this && dragMediaSrcEl.parentElement === this.parentElement) {
+                const draggedId = dragMediaSrcEl.dataset.id;
+                const targetId = this.dataset.id;
+
+                const draggedIndex = currentMediaList.findIndex(m => m.id === draggedId);
+                const targetIndex = currentMediaList.findIndex(m => m.id === targetId);
+
+                if (draggedIndex > -1 && targetIndex > -1) {
+                    const [draggedItem] = currentMediaList.splice(draggedIndex, 1);
+                    currentMediaList.splice(targetIndex, 0, draggedItem);
+
+                    const newOrderIds = currentMediaList.map(m => m.id);
+                    renderMediaGrid();
+
+                    fetch('/api/media-reorder', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ orderIds: newOrderIds })
+                    }).catch(e => console.error(e));
+                }
+            }
+            return false;
+        }
+
+        function renderMediaGrid() {
+            const grid = document.getElementById('media-grid');
+            grid.innerHTML = '';
+            currentMediaList.forEach(media => {
+                grid.appendChild(createMediaLibButton(media));
+            });
+        }
+        
+        function loadMediaUploads() {
+            fetch('/api/media-list')
+            .then(res => res.json())
+            .then(medias => {
+                currentMediaList = medias;
+                renderMediaGrid();
+            })
+            .catch(e => console.error("Erro ao carregar mídias:", e));
+        }
+
+        window.addEventListener('load', loadMediaUploads);
+
+        document.getElementById('btn-upload-media-lib').addEventListener('click', () => {
+            document.getElementById('media-file-input').click();
+        });
+
+        document.getElementById('media-file-input').addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const overlay = document.getElementById('upload-overlay');
+                document.getElementById('upload-text').innerText = "Enviando mídia...";
+                overlay.classList.add('show');
+
+                fetch('/upload', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    overlay.classList.remove('show');
+                    if (data.url) {
+                        loadMediaUploads();
+                    }
+                })
+                .catch(err => {
+                    overlay.classList.remove('show');
+                    alert('Erro no upload de mídia.');
+                });
+                
+                e.target.value = '';
+            }
+        });
+
 
         let currentAudioList = [];
         let currentEditAudioId = null;
@@ -1770,10 +2008,13 @@
                 if (contentEl && contentEl.tagName === 'VIDEO') {
                     btnCtxMute.style.display = 'flex';
                     ctxVideoSeek.style.display = 'block';
+                    ctxVideoVolume.style.display = 'block';
                     btnCtxMute.innerHTML = media.muted ? '🔇 Mudo' : '🔊 Áudio';
+                    ctxVideoVolume.value = media.volume !== undefined ? media.volume : 1;
                 } else {
                     btnCtxMute.style.display = 'none';
                     ctxVideoSeek.style.display = 'none';
+                    ctxVideoVolume.style.display = 'none';
                 }
                 ctxOpacity.value = media.opacity !== undefined ? media.opacity : 1;
             }
@@ -2090,6 +2331,7 @@
                             document.getElementById('soundpad-sidebar').classList.add('open');
                         } else {
                             createMediaFromUrl(data.url, canvasX, canvasY);
+                            if (typeof loadMediaUploads === "function") loadMediaUploads();
                         }
                     }
                 })
@@ -2130,7 +2372,7 @@
                 if (img) {
                     let src = img.getAttribute('src');
                     // Falha caso src seja apenas um caminho relativo (raro no drag and drop de abas, mas previne quebra)
-                    if (src && (src.startsWith('http') || src.startsWith('data:')) && !src.includes('/imgres?')) {
+                    if (src && (src.startsWith('http') || src.startsWith('data:') || src.startsWith('/uploads/')) && !src.includes('/imgres?')) {
                         return src;
                     }
                 }
@@ -2152,7 +2394,7 @@
 
             // Priority 4: Plain text fallback
             let plain = dataTransfer.getData('text/plain');
-            if (plain && (plain.startsWith('http') || plain.startsWith('data:')) && !plain.includes('/imgres?')) {
+            if (plain && (plain.startsWith('http') || plain.startsWith('data:') || plain.startsWith('/uploads/')) && !plain.includes('/imgres?')) {
                 return plain.trim();
             }
 
@@ -2181,7 +2423,7 @@
                 handleFileUpload(e.dataTransfer.files[0], mouseX_inCanvas, mouseY_inCanvas);
             } else {
                 let url = extractUrlFromData(e.dataTransfer);
-                if (url && (url.startsWith('http') || url.startsWith('data:'))) {
+                if (url && (url.startsWith('http') || url.startsWith('data:') || url.startsWith('/uploads/'))) {
                     createMediaFromUrl(url, mouseX_inCanvas, mouseY_inCanvas);
                 }
             }
@@ -2200,7 +2442,7 @@
                 handleFileUpload(e.clipboardData.files[0], centerX, centerY);
             } else {
                 let url = extractUrlFromData(e.clipboardData);
-                if (url && (url.startsWith('http') || url.startsWith('data:'))) {
+                if (url && (url.startsWith('http') || url.startsWith('data:') || url.startsWith('/uploads/'))) {
                     createMediaFromUrl(url, centerX, centerY);
                 }
             }
@@ -2471,6 +2713,18 @@
             }
         });
 
+        socket.on('media:video_volume', (data) => {
+            if (mediaState[data.id]) {
+                mediaState[data.id].volume = data.volume;
+                const el = document.getElementById(`admin-${data.id}`);
+                if (el) {
+                    const video = el.querySelector('video');
+                    if (video) video.volume = data.volume;
+                    if (selectedElements.has(data.id) && selectedElements.size === 1 && ctxVideoVolume) ctxVideoVolume.value = data.volume;
+                }
+            }
+        });
+
         socket.on('media:video_seek', (data) => {
             if (mediaState[data.id]) {
                 mediaState[data.id].currentTime = data.currentTime;
@@ -2621,6 +2875,7 @@
                     mediaEl.loop = true;
                     mediaEl.muted = data.muted !== undefined ? data.muted : true;
                     data.muted = mediaEl.muted;
+                    if (data.volume !== undefined) mediaEl.volume = data.volume;
                     mediaEl.classList.add('media-content');
 
                     // Aplica a posição de tempo correta caso exista nos dados
@@ -3114,6 +3369,20 @@
                     const time = (val / 100) * video.duration;
                     video.currentTime = time;
                     socket.emit('media:video_seek', { id: id, currentTime: time });
+                }
+            });
+        });
+
+        ctxVideoVolume.addEventListener('input', () => {
+            if (selectedElements.size === 0) return;
+            const val = parseFloat(ctxVideoVolume.value);
+            selectedElements.forEach(id => {
+                if (mediaState[id]) mediaState[id].volume = val;
+                const container = document.getElementById(`admin-${id}`);
+                const video = container ? container.querySelector('video') : null;
+                if (video) {
+                    video.volume = val;
+                    socket.emit('media:video_volume', { id: id, volume: val });
                 }
             });
         });

@@ -9,15 +9,42 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+const mediaDbPath = path.join(__dirname, 'media_db.json');
+let mediaList = [];
+
+function loadMediaDb() {
+    if (fs.existsSync(mediaDbPath)) {
+        try {
+            mediaList = JSON.parse(fs.readFileSync(mediaDbPath, 'utf8'));
+        } catch(e) {
+            mediaList = [];
+        }
+    } else {
+        mediaList = [];
+        saveMediaDb();
+    }
+}
+
+function saveMediaDb() {
+    fs.writeFileSync(mediaDbPath, JSON.stringify(mediaList, null, 2));
+}
+
+loadMediaDb();
+
 // Configuração e limpeza da pasta de Uploads ao iniciar o servidor
 const uploadsDir = path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
 } else {
-    // Limpa arquivos antigos para não acumular lixo
+    // Limpa arquivos antigos para não acumular lixo (exceto favoritados)
     const files = fs.readdirSync(uploadsDir);
+    const favoritedUrls = mediaList.filter(m => m.pinned).map(m => m.url.split('?')[0]);
+
     for (const file of files) {
-        try { fs.unlinkSync(path.join(uploadsDir, file)); } catch(e) {}
+        const fileUrl = '/uploads/' + encodeURIComponent(file);
+        if (!favoritedUrls.includes(fileUrl)) {
+            try { fs.unlinkSync(path.join(uploadsDir, file)); } catch(e) {}
+        }
     }
 }
 
@@ -213,6 +240,133 @@ app.post('/api/audio-reorder', (req, res) => {
     }
 });
 
+// ======================= MEDIA API =======================
+
+// Endpoint para listar as mídias e sincronizar com uploads físicos
+app.get('/api/media-list', (req, res) => {
+    try {
+        const files = fs.readdirSync(uploadsDir);
+        const mediaFiles = files.filter(f => f.match(/\.(png|jpe?g|gif|webp|mp4|webm)$/i));
+        const fileUrls = mediaFiles.map(f => '/uploads/' + encodeURIComponent(f));
+        
+        // Adiciona novos arquivos à lista se não existirem
+        fileUrls.forEach(url => {
+            const baseUrls = mediaList.map(m => m.url.split('?')[0]);
+            if (!baseUrls.includes(url)) {
+                const filename = decodeURIComponent(url.split('/').pop());
+                const nameWithoutExt = filename.replace(/\.[^/.]+$/, ""); // Remove extensão
+                const shortName = nameWithoutExt.length > 25 ? nameWithoutExt.substring(0, 22) + '...' : nameWithoutExt;
+                mediaList.push({
+                    id: 'med-' + Date.now() + Math.random().toString(36).substring(2,9),
+                    name: shortName,
+                    url: url,
+                    pinned: false
+                });
+            }
+        });
+
+        // Remover da mediaList os arquivos de upload que não existem mais fisicamente
+        mediaList = mediaList.filter(m => {
+            if (m.url.startsWith('/uploads/')) {
+                const baseUrl = m.url.split('?')[0];
+                return fileUrls.includes(baseUrl);
+            }
+            return true; // mantém URLs externas
+        });
+
+        saveMediaDb();
+    } catch(e) {
+        console.error("Erro ao sincronizar uploads de mídia:", e);
+    }
+    
+    // Sort logic: pinned first, then preserve existing order
+    const pinned = mediaList.filter(m => m.pinned);
+    const unpinned = mediaList.filter(m => !m.pinned);
+    res.json([...pinned, ...unpinned]);
+});
+
+// Atualizar propriedades de uma mídia
+app.post('/api/media-update/:id', (req, res) => {
+    const id = req.params.id;
+    const { name, pinned } = req.body;
+    
+    const media = mediaList.find(m => m.id === id);
+    if (media) {
+        if (name !== undefined) media.name = name;
+        if (pinned !== undefined) media.pinned = pinned;
+        saveMediaDb();
+        res.json({ success: true, media });
+    } else {
+        res.status(404).json({ error: 'Mídia não encontrada' });
+    }
+});
+
+// Excluir uma mídia
+app.post('/api/media-delete/:id', (req, res) => {
+    const id = req.params.id;
+    const mediaIndex = mediaList.findIndex(m => m.id === id);
+    
+    if (mediaIndex !== -1) {
+        const media = mediaList[mediaIndex];
+        mediaList.splice(mediaIndex, 1);
+        
+        // Se for um arquivo local de upload, apaga do disco permanentemente
+        if (media.url.startsWith('/uploads/')) {
+            const filename = decodeURIComponent(media.url.split('?')[0].split('/').pop());
+            const filepath = path.join(uploadsDir, filename);
+            try { if (fs.existsSync(filepath)) fs.unlinkSync(filepath); } catch(e) {}
+        }
+        
+        saveMediaDb();
+        res.json({ success: true });
+    } else {
+        res.status(404).json({ error: 'Mídia não encontrada' });
+    }
+});
+
+// Reordenar a lista de mídia
+app.post('/api/media-reorder', (req, res) => {
+    const { orderIds } = req.body; // array de IDs na nova ordem
+    if (Array.isArray(orderIds)) {
+        const newList = [];
+        orderIds.forEach(id => {
+            const media = mediaList.find(m => m.id === id);
+            if (media) newList.push(media);
+        });
+        
+        // Se ficou faltando algum, adiciona no final
+        mediaList.forEach(media => {
+            if (!newList.find(m => m.id === media.id)) {
+                newList.push(media);
+            }
+        });
+        
+        mediaList = newList;
+        saveMediaDb();
+        res.json({ success: true });
+    } else {
+        res.status(400).json({ error: 'Formato de orderIds inválido' });
+    }
+});
+
+// Adicionar mídia à biblioteca (por ex., via URL externa)
+app.post('/api/media-add', (req, res) => {
+    const { url, name } = req.body;
+    if (url) {
+        const newMedia = {
+            id: 'med-' + Date.now() + Math.random().toString(36).substring(2,9),
+            name: name || 'Mídia Externa',
+            url: url,
+            pinned: true
+        };
+        mediaList.push(newMedia);
+        saveMediaDb();
+        res.json({ success: true, media: newMedia });
+    } else {
+        res.status(400).json({ error: 'URL inválida' });
+    }
+});
+
 // Serve static files from 'public' folder
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -327,6 +481,13 @@ io.on('connection', (socket) => {
         if (appState[data.id]) {
             appState[data.id].muted = data.muted;
             socket.broadcast.emit('media:video_mute', data);
+        }
+    });
+
+    socket.on('media:video_volume', (data) => {
+        if (appState[data.id]) {
+            appState[data.id].volume = data.volume;
+            socket.broadcast.emit('media:video_volume', data);
         }
     });
 

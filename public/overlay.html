@@ -175,6 +175,13 @@
             if (globalAudio.src && globalAudio.src !== window.location.href) {
                 globalAudio.play().catch(e => console.error(e));
             }
+            // Tenta dar play em todos os vídeos que possam estar pausados por falta de interação
+            Object.values(mediaElements).forEach(container => {
+                const video = container.querySelector('video');
+                if (video && video.paused) {
+                    video.play().catch(e => console.error(e));
+                }
+            });
         });
 
         socket.on('audio:sync', (data) => {
@@ -323,7 +330,27 @@
             const el = mediaElements[data.id];
             if (el) {
                 const video = el.querySelector('video');
-                if (video) video.muted = data.muted;
+                if (video) {
+                    video.muted = data.muted;
+                    if (!data.muted && video.paused) {
+                        let playPromise = video.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(e => {
+                                if (e.name === 'NotAllowedError') {
+                                    document.getElementById('interaction-overlay').style.display = 'flex';
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        });
+
+        socket.on('media:video_volume', (data) => {
+            const el = mediaElements[data.id];
+            if (el) {
+                const video = el.querySelector('video');
+                if (video) video.volume = data.volume;
             }
         });
 
@@ -394,8 +421,19 @@
                     mediaEl.autoplay = true;
                     mediaEl.loop = true;
                     mediaEl.muted = data.muted !== undefined ? data.muted : true;
+                    if (data.volume !== undefined) mediaEl.volume = data.volume;
                     if (data.currentTime) {
                         mediaEl.currentTime = data.currentTime;
+                    }
+                    
+                    // Tentativa explícita de play para pegar bloqueio do navegador
+                    let playPromise = mediaEl.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(e => {
+                            if (e.name === 'NotAllowedError') {
+                                document.getElementById('interaction-overlay').style.display = 'flex';
+                            }
+                        });
                     }
                 } else {
                     mediaEl = document.createElement('img');
