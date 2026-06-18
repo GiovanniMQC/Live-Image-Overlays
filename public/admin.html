@@ -273,18 +273,100 @@
         #selection-toolbar button {
             background: #333; border: 1px solid #555; color: white; padding: 8px 12px;
             border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;
-            display: flex; align-items: center; gap: 6px; transition: all 0.1s;
+            display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.1s;
         }
         #selection-toolbar button:hover { background: #4a4a4a; transform: scale(1.05); }
         #selection-toolbar button.danger { background: #dc3545; border-color: #bd2130; }
         #selection-toolbar button.danger:hover { background: #c82333; }
         #selection-toolbar .video-only { display: none; }
+        #selection-toolbar.has-video .toolbar-group.video-only { display: flex; }
+        #selection-toolbar.has-video .toolbar-control-group.video-only { display: flex; }
+        #selection-toolbar.has-video .toolbar-divider.video-only { display: block; }
+        #selection-toolbar.has-video input.video-only { display: block; }
+
+        .toolbar-group {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .toolbar-divider {
+            width: 1px;
+            height: 24px;
+            background: #555;
+            margin: 0 4px;
+        }
+
+        .toolbar-control-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #222;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid #444;
+        }
+        .toolbar-control-group span {
+            font-size: 14px;
+            pointer-events: none;
+            color: #ccc;
+        }
+        #selection-toolbar input[type="range"] {
+            cursor: pointer;
+            accent-color: #007bff;
+            height: 20px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            outline: none;
+            margin: 0;
+        }
+        
+        /* WebKit Track */
+        #selection-toolbar input[type="range"]::-webkit-slider-runnable-track {
+            height: 4px;
+            background: #555;
+            border-radius: 2px;
+        }
+        
+        /* WebKit Thumb */
+        #selection-toolbar input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+            margin-top: -5px;
+        }
+        
+        /* Firefox Track */
+        #selection-toolbar input[type="range"]::-moz-range-track {
+            height: 4px;
+            background: #555;
+            border-radius: 2px;
+        }
+        
+        /* Firefox Thumb */
+        #selection-toolbar input[type="range"]::-moz-range-thumb {
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+            border: none;
+        }
         
         #ctx-video-seek { width: 100px; cursor: pointer; }
 
         .hidden-media {
             opacity: 0.3 !important;
             outline-color: #d39e00 !important;
+        }
+        .hidden-media .media-content {
+            opacity: 1 !important;
         }
 
         #global-resize-handle {
@@ -691,14 +773,51 @@
         
             <!-- UI Global de Seleção (Fora do scale da imagem, mas movida para dentro do wrapper para acompanhar o alinhamento das margens) -->
             <div id="selection-toolbar">
-                <button id="btn-ctx-layer-up" title="Trazer para Frente">⏫</button>
-                <button id="btn-ctx-layer-down" title="Enviar para Trás">⏬</button>
-                <button id="btn-ctx-hide" title="Ocultar/Mostrar">👁️ Ocultar</button>
-                <button id="btn-ctx-mute" class="video-only" title="Mudo/Áudio">🔊 Áudio</button>
-                <input type="range" id="ctx-video-seek" class="video-only" min="0" max="100" value="0">
-                <input type="range" id="ctx-video-volume" class="video-only" min="0" max="1" step="0.01" value="1" title="Volume do Vídeo" style="width: 80px; cursor: pointer;">
-                <input type="range" id="ctx-opacity" min="0" max="1" step="0.01" value="1" title="Opacidade (Transparência)" style="width: 80px; cursor: pointer;">
-                <button id="btn-ctx-delete" class="danger" title="Excluir">🗑️ Excluir</button>
+                <!-- Group: Layer -->
+                <div class="toolbar-group">
+                    <button id="btn-ctx-layer-up" title="Trazer para Frente">⏫</button>
+                    <button id="btn-ctx-layer-down" title="Enviar para Trás">⏬</button>
+                </div>
+                
+                <div class="toolbar-divider"></div>
+
+                <!-- Group: Visibility -->
+                <button id="btn-ctx-hide" title="Ocultar/Mostrar">👁️</button>
+
+                <!-- Group: Transform -->
+                <div class="toolbar-group" id="transform-group">
+                    <button id="btn-ctx-flip-h" title="Espelhar Horizontal">↔️</button>
+                    <button id="btn-ctx-flip-v" title="Espelhar Vertical">↕️</button>
+                </div>
+
+                <div class="toolbar-divider"></div>
+
+                <!-- Group: Duplicate -->
+                <button id="btn-ctx-duplicate" title="Duplicar (Ctrl+D)">📄</button>
+
+                <div class="toolbar-divider"></div>
+
+                <!-- Group: Opacity -->
+                <div class="toolbar-control-group" title="Opacidade (Transparência)">
+                    <span>🌗</span>
+                    <input type="range" id="ctx-opacity" min="0" max="1" step="0.01" value="1" style="width: 80px;">
+                </div>
+
+                <!-- Group: Video (Only shows for video) -->
+                <div class="toolbar-divider video-only"></div>
+                <div class="toolbar-control-group video-only" style="padding-left: 4px;">
+                    <button id="btn-ctx-mute" title="Mudo/Áudio" style="background:transparent; border:none; padding:2px 4px; margin:0; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; box-shadow:none;">🔊</button>
+                    <input type="range" id="ctx-video-volume" min="0" max="1" step="0.01" value="1" title="Volume do Vídeo" style="width: 60px;">
+                </div>
+                <div class="toolbar-control-group video-only" title="Tempo do Vídeo">
+                    <span>⏱️</span>
+                    <input type="range" id="ctx-video-seek" min="0" max="100" value="0" style="width: 100px;">
+                </div>
+
+                <div class="toolbar-divider"></div>
+
+                <!-- Group: Delete -->
+                <button id="btn-ctx-delete" class="danger" title="Excluir">🗑️</button>
             </div>
             <div id="global-resize-handle"></div>
             <div id="global-rotate-handle"></div>
@@ -826,22 +945,9 @@
         const ctxVideoVolume = document.getElementById('ctx-video-volume');
         const ctxOpacity = document.getElementById('ctx-opacity');
         
-        // Novos botões
-        const btnCtxFlipH = document.createElement('button');
-        btnCtxFlipH.title = "Espelhar Horizontal";
-        btnCtxFlipH.innerText = "↔️";
-        
-        const btnCtxFlipV = document.createElement('button');
-        btnCtxFlipV.title = "Espelhar Vertical";
-        btnCtxFlipV.innerText = "↕️";
-
-        const btnCtxDuplicate = document.createElement('button');
-        btnCtxDuplicate.title = "Duplicar (Ctrl+D)";
-        btnCtxDuplicate.innerText = "📄";
-
-        selectionToolbar.insertBefore(btnCtxFlipH, btnCtxDelete);
-        selectionToolbar.insertBefore(btnCtxFlipV, btnCtxDelete);
-        selectionToolbar.insertBefore(btnCtxDuplicate, btnCtxDelete);
+        const btnCtxFlipH = document.getElementById('btn-ctx-flip-h');
+        const btnCtxFlipV = document.getElementById('btn-ctx-flip-v');
+        const btnCtxDuplicate = document.getElementById('btn-ctx-duplicate');
 
         // Carrega as preferências do usuário salvas no navegador
         if (localStorage.getItem('adminName')) {
@@ -2003,18 +2109,16 @@
             
             const media = mediaState[id];
             if (media && selectedElements.size === 1) {
-                btnCtxHide.innerHTML = media.visible ? '👁️ Ocultar' : '🙈 Mostrar';
+                btnCtxHide.innerHTML = media.visible ? '👁️' : '🙈';
+                btnCtxHide.title = media.visible ? 'Ocultar' : 'Mostrar';
                 const contentEl = el ? el.querySelector('.media-content') : null;
                 if (contentEl && contentEl.tagName === 'VIDEO') {
-                    btnCtxMute.style.display = 'flex';
-                    ctxVideoSeek.style.display = 'block';
-                    ctxVideoVolume.style.display = 'block';
-                    btnCtxMute.innerHTML = media.muted ? '🔇 Mudo' : '🔊 Áudio';
+                    selectionToolbar.classList.add('has-video');
+                    btnCtxMute.innerHTML = media.muted ? '🔇' : '🔊';
+                    btnCtxMute.title = media.muted ? 'Desmutar' : 'Mudo';
                     ctxVideoVolume.value = media.volume !== undefined ? media.volume : 1;
                 } else {
-                    btnCtxMute.style.display = 'none';
-                    ctxVideoSeek.style.display = 'none';
-                    ctxVideoVolume.style.display = 'none';
+                    selectionToolbar.classList.remove('has-video');
                 }
                 ctxOpacity.value = media.opacity !== undefined ? media.opacity : 1;
             }
@@ -2164,7 +2268,7 @@
                         socket.emit('media:toggle_visibility', { id: id, visible: media.visible });
                     }
                 });
-                if (selectedElements.size === 1) btnCtxHide.innerText = newState ? '👁️ Ocultar' : '🙈 Mostrar';
+                if (selectedElements.size === 1) btnCtxHide.innerText = newState ? '👁️' : '🙈'; btnCtxHide.title = newState ? 'Ocultar' : 'Mostrar';
              }
 
             // Mostra o sistema de Crop ao segurar o Alt
@@ -2676,10 +2780,10 @@
                     const btnVisibility = el.querySelector('.btn-hide');
                     if (data.visible) {
                         el.classList.remove('hidden-media');
-                        if (selectedElementId === data.id && btnCtxHide) btnCtxHide.innerText = '👁️ Ocultar';
+                        if (selectedElementId === data.id && btnCtxHide) { btnCtxHide.innerText = '👁️'; btnCtxHide.title = 'Ocultar'; }
                     } else {
                         el.classList.add('hidden-media');
-                        if (selectedElementId === data.id && btnCtxHide) btnCtxHide.innerText = '🙈 Mostrar';
+                        if (selectedElementId === data.id && btnCtxHide) { btnCtxHide.innerText = '🙈'; btnCtxHide.title = 'Mostrar'; }
                     }
                 }
             }
@@ -2708,7 +2812,7 @@
                 if (el) {
                     const video = el.querySelector('video');
                     if (video) video.muted = data.muted;
-                    if (selectedElements.has(data.id) && selectedElements.size === 1 && btnCtxMute) btnCtxMute.innerText = data.muted ? '🔇 Mudo' : '🔊 Áudio';
+                    if (selectedElements.has(data.id) && selectedElements.size === 1 && btnCtxMute) { btnCtxMute.innerText = data.muted ? '🔇' : '🔊'; btnCtxMute.title = data.muted ? 'Desmutar' : 'Mudo'; }
                 }
             }
         });
@@ -3305,7 +3409,7 @@
                 }
                 socket.emit('media:toggle_visibility', { id: id, visible: newState });
             });
-            if (selectedElements.size === 1) btnCtxHide.innerText = newState ? '👁️ Ocultar' : '🙈 Mostrar';
+            if (selectedElements.size === 1) btnCtxHide.innerText = newState ? '👁️' : '🙈'; btnCtxHide.title = newState ? 'Ocultar' : 'Mostrar';
         });
 
         btnCtxDuplicate.addEventListener('click', () => {
@@ -3356,7 +3460,7 @@
                     socket.emit('media:video_mute', { id: id, muted: newState });
                 }
             });
-            btnCtxMute.innerText = newState ? '🔇 Mudo' : '🔊 Áudio';
+            btnCtxMute.innerText = newState ? '🔇' : '🔊'; btnCtxMute.title = newState ? 'Desmutar' : 'Mudo';
         });
 
         ctxVideoSeek.addEventListener('input', () => {
