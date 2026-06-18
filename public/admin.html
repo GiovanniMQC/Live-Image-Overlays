@@ -578,9 +578,16 @@
         </div>
 
         <div class="tool-container">
-            <button class="tool-btn" title="Cursor e Perfil" onclick="toggleToolPanel('panel-cursor', this)">🖱️</button>
+            <button class="tool-btn" title="Preferências" onclick="toggleToolPanel('panel-cursor', this)">⚙️</button>
             <div id="panel-cursor" class="tool-panel">
-                <h3>🖱️ Seu Cursor</h3>
+                <h3>⚙️ Preferências</h3>
+                <div class="input-group">
+                    <label>Modo de Navegação</label>
+                    <select id="nav-mode" style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; cursor: pointer;">
+                        <option value="mouse">Mouse (Scroll = Zoom)</option>
+                        <option value="trackpad">Trackpad (Scroll = Mover)</option>
+                    </select>
+                </div>
                 <div class="input-group">
                     <label>Cor do Cursor</label>
                     <input type="color" id="admin-color" value="#ff0088" title="Cor do seu Cursor">
@@ -631,8 +638,7 @@
             <div id="panel-help" class="tool-panel">
                 <h3>❓ Atalhos e Ajuda</h3>
                 <div style="font-size: 13px; color: #ccc; line-height: 1.8;">
-                    🖱️ <b>Scroll:</b> Zoom na Tela<br>
-                    🖱️ <b>Scroll na Imagem:</b> Escala Uniforme<br>
+                    <span id="help-scroll-text">🖱️ <b>Scroll:</b> Zoom<br>🖱️ <b>Espaço + Arrastar:</b> Mover Tela</span><br>
                     ⌨️ <b>Shift + Scroll:</b> Esticar na Horizontal<br>
                     ⌨️ <b>Alt + Scroll:</b> Esticar na Vertical<br>
                     ⌨️ <b>Delete:</b> Apagar Selecionada<br>
@@ -749,6 +755,7 @@
         const zoomLevelDisplay = document.getElementById('zoom-level');
         const adminNameInput = document.getElementById('admin-name');
         const adminColorInput = document.getElementById('admin-color');
+        const navModeSelect = document.getElementById('nav-mode');
         
         // Elementos do Audio Player
         const btnAudioStop = document.getElementById('btn-audio-stop');
@@ -798,9 +805,28 @@
         if (localStorage.getItem('adminColor')) {
             adminColorInput.value = localStorage.getItem('adminColor');
         }
+        if (localStorage.getItem('navMode')) {
+            navModeSelect.value = localStorage.getItem('navMode');
+        }
+        
         // Salva as preferências automaticamente ao digitar/alterar
         adminNameInput.addEventListener('input', () => localStorage.setItem('adminName', adminNameInput.value));
         adminColorInput.addEventListener('input', () => localStorage.setItem('adminColor', adminColorInput.value));
+        navModeSelect.addEventListener('change', () => {
+            localStorage.setItem('navMode', navModeSelect.value);
+            updateHelpText();
+        });
+
+        const helpScrollText = document.getElementById('help-scroll-text');
+        function updateHelpText() {
+            if (!helpScrollText || !navModeSelect) return;
+            if (navModeSelect.value === 'mouse') {
+                helpScrollText.innerHTML = `🖱️ <b>Scroll:</b> Zoom<br>🖱️ <b>Espaço + Arrastar:</b> Mover Tela`;
+            } else {
+                helpScrollText.innerHTML = `🖱️ <b>Scroll:</b> Mover Tela<br>🖱️ <b>Pinça (Pinch):</b> Zoom`;
+            }
+        }
+        updateHelpText();
         
         let lastToolbarLeft, lastToolbarTop, lastHandleLeft, lastHandleTop, lastRotateHandleLeft, lastRotateHandleTop, lastVideoSeek;
         
@@ -1830,17 +1856,27 @@
                             };
 
                             // Calcula a escala necessária
-                            const baseWidth = contentEl.offsetWidth || 1;
-                            const baseHeight = contentEl.offsetHeight || 1;
+                            let baseWidth = parseFloat(contentEl.dataset.baseWidth);
+                            let baseHeight = parseFloat(contentEl.dataset.baseHeight);
+                            if (!baseWidth || baseWidth < 2) {
+                                baseWidth = contentEl.offsetWidth || 1;
+                                baseHeight = contentEl.offsetHeight || 1;
+                            }
+
+                            const crop = media.crop || { t: 0, r: 0, b: 0, l: 0 };
+                            const cT = Math.round(crop.t), cR = Math.round(crop.r), cB = Math.round(crop.b), cL = Math.round(crop.l);
+                            const visibleWidth = Math.round(Math.max(1, baseWidth - cL - cR));
+                            const visibleHeight = Math.round(Math.max(1, baseHeight - cT - cB));
                             
-                            const newScaleX = 1920 / baseWidth;
-                            const newScaleY = 1080 / baseHeight;
+                            // Calcula a escala esticando exatamente para o limite (Non-Proportional)
+                            const scaleX = 1920 / visibleWidth;
+                            const scaleY = 1080 / visibleHeight;
 
                             // Aplica estado Full Screen
                             media.x = 0;
                             media.y = 0;
-                            media.scaleX = newScaleX;
-                            media.scaleY = newScaleY;
+                            media.scaleX = scaleX;
+                            media.scaleY = scaleY;
                             media.rotation = 0;
                             media.isFullScreen = true;
                         } else {
@@ -2174,16 +2210,57 @@
         // EVENTOS DE SCROLL (WHEEL)
         // ============================================
         workspace.addEventListener('wheel', (e) => {
-            // Ignora scroll padrão
-            e.preventDefault();
+            if (!navModeSelect) return; // Segurança contra falhas
             
             const draggable = e.target.closest('.draggable');
-            if (draggable && !isPanning) {
-                // Redimensionar a Imagem (Scroll sobre a imagem)
+            const isMouseMode = navModeSelect.value === 'mouse';
+            
+            // Verifica suavidade do scroll para dar suporte perfeito a trackpads e mouses
+            let zoomAmount;
+            if (Math.abs(e.deltaY) < 50) {
+                zoomAmount = e.deltaY * -0.01; // Sensibilidade suave para trackpads
+            } else {
+                zoomAmount = e.deltaY > 0 ? -0.05 : 0.05; // Mouse tradicional
+            }
+
+            // Lógica de Zoom:
+            // Se for Mouse Mode e NENHUM modificador de teclado = Zoom
+            // Se for Trackpad Mode e segurar CTRL (ou pinça) = Zoom
+            const isZoomIntent = (isMouseMode && !e.ctrlKey && !e.shiftKey && !e.altKey) || e.ctrlKey;
+
+            if (isZoomIntent) {
+                e.preventDefault(); // Trava a movimentação para aplicar apenas o zoom
+                
+                if (draggable && !isPanning) {
+                    // Escala Uniforme da Mídia
+                    const id = draggable.id.replace('admin-', '');
+                    if (mediaState[id]) {
+                        let sx = mediaState[id].scaleX !== undefined ? mediaState[id].scaleX : (mediaState[id].scale || 1);
+                        let sy = mediaState[id].scaleY !== undefined ? mediaState[id].scaleY : (mediaState[id].scale || 1);
+
+                        sx += zoomAmount;
+                        sy += zoomAmount;
+
+                        sx = Math.max(0.1, Math.min(sx, 10));
+                        sy = Math.max(0.1, Math.min(sy, 10));
+
+                        mediaState[id].scaleX = sx;
+                        mediaState[id].scaleY = sy;
+                        applyTransform(id);
+                        socket.emit('media:scale_sync', { id: id, scaleX: sx, scaleY: sy });
+                    }
+                } else {
+                    // Zoom na Tela (Canvas)
+                    updateScale(currentScale + zoomAmount, e.clientX, e.clientY);
+                }
+                return;
+            }
+
+            // Lógica de Esticar Imagem (Shift ou Alt + Scroll)
+            if (draggable && !isPanning && (e.shiftKey || e.altKey)) {
+                e.preventDefault(); // Trava a movimentação
                 const id = draggable.id.replace('admin-', '');
                 if (mediaState[id]) {
-                    const zoomAmount = e.deltaY > 0 ? -0.05 : 0.05; // Ajuste sensibilidade aqui
-                    
                     let sx = mediaState[id].scaleX !== undefined ? mediaState[id].scaleX : (mediaState[id].scale || 1);
                     let sy = mediaState[id].scaleY !== undefined ? mediaState[id].scaleY : (mediaState[id].scale || 1);
 
@@ -2191,27 +2268,22 @@
                         sx += zoomAmount; // Esticar Horizontal
                     } else if (e.altKey) {
                         sy += zoomAmount; // Esticar Vertical
-                    } else {
-                        sx += zoomAmount;
-                        sy += zoomAmount;
                     }
 
-                    sx = Math.max(0.1, Math.min(sx, 10)); // Limites de escala
+                    sx = Math.max(0.1, Math.min(sx, 10));
                     sy = Math.max(0.1, Math.min(sy, 10));
 
                     mediaState[id].scaleX = sx;
                     mediaState[id].scaleY = sy;
                     applyTransform(id);
 
-                    // Envia para o OBS
                     socket.emit('media:scale_sync', { id: id, scaleX: sx, scaleY: sy });
                 }
-            } else {
-                // Zoom na Tela (Canvas)
-                const zoomAmount = e.deltaY > 0 ? -0.05 : 0.05;
-                // Envia a posição real do mouse na tela para o zoom focar corretamente com as novas lógicas de alinhamento
-                updateScale(currentScale + zoomAmount, e.clientX, e.clientY);
+                return;
             }
+            
+            // Se for movimento puro no Trackpad, a função chega aqui sem chamar e.preventDefault(),
+            // permitindo que o navegador mova a tela lindamente sozinho.
         }, { passive: false });
 
 
