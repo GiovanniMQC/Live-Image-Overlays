@@ -1374,23 +1374,30 @@
         }
         requestAnimationFrame(renderLoop);
         
-        function toggleSoundpad() {
-            document.getElementById('soundpad-sidebar').classList.toggle('open');
+        function closeAllSidebars() {
+            ['soundpad-sidebar', 'media-sidebar', 'tts-sidebar'].forEach(id => {
+                const sidebar = document.getElementById(id);
+                if (sidebar) sidebar.classList.remove('open');
+            });
+        }
+
+        function toggleSidebar(sidebarId) {
+            const el = document.getElementById(sidebarId);
+            const wasOpen = el.classList.contains('open');
+            
+            closeAllSidebars();
+            
+            if (!wasOpen) {
+                el.classList.add('open');
+            }
+            
             document.querySelectorAll('.tool-panel').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
         }
 
-        function toggleMediaSidebar() {
-            document.getElementById('media-sidebar').classList.toggle('open');
-            document.querySelectorAll('.tool-panel').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-        }
-
-        function toggleTtsSidebar() {
-            document.getElementById('tts-sidebar').classList.toggle('open');
-            document.querySelectorAll('.tool-panel').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-        }
+        function toggleSoundpad() { toggleSidebar('soundpad-sidebar'); }
+        function toggleMediaSidebar() { toggleSidebar('media-sidebar'); }
+        function toggleTtsSidebar() { toggleSidebar('tts-sidebar'); }
 
         let currentMediaList = [];
 
@@ -2033,9 +2040,10 @@
             const panel = document.getElementById(panelId);
             const isCurrentlyActive = panel.classList.contains('active');
             
-            // Fecha todos os painéis e remove "active" dos botões
+            // Fecha todos os painéis e sidebars e remove "active" dos botões
             document.querySelectorAll('.tool-panel').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            if (typeof closeAllSidebars === 'function') closeAllSidebars();
 
             if (!isCurrentlyActive) {
                 panel.classList.add('active');
