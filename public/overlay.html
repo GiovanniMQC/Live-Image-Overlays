@@ -48,10 +48,32 @@
             overflow: hidden;
             transform: translateZ(0);
         }
+
+        /* TTS Character */
+        #tts-character-container {
+            position: fixed;
+            bottom: -400px;
+            transition: bottom 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 99999;
+            pointer-events: none;
+        }
+        #tts-character-container.show {
+            bottom: 20px;
+        }
+        #tts-character-container img {
+            max-height: 300px;
+            max-width: 300px;
+            object-fit: contain;
+            filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.5));
+        }
     </style>
 </head>
 <body>
     <div id="interaction-overlay">🔊 Clique aqui para permitir o áudio</div>
+    
+    <div id="tts-character-container">
+        <img id="tts-character-img" src="" alt="Character">
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -484,6 +506,51 @@
                 }
             });
         }, 2000);
+
+        // --- TTS Character Logic ---
+        const ttsContainer = document.getElementById('tts-character-container');
+        const ttsImg = document.getElementById('tts-character-img');
+        
+        socket.on('character:speak', (data) => {
+            // Cancela qualquer fala anterior
+            window.speechSynthesis.cancel();
+
+            // Atualiza imagem
+            if (data.imageUrl) {
+                ttsImg.src = data.imageUrl;
+            } else {
+                // Placeholder padrão
+                ttsImg.src = "https://cdn-icons-png.flaticon.com/512/4712/4712010.png";
+            }
+
+            // Posição
+            if (data.position === 'left') {
+                ttsContainer.style.left = '20px';
+                ttsContainer.style.right = 'auto';
+                ttsImg.style.transform = 'scaleX(-1)'; // Vira o personagem para olhar para o centro
+            } else {
+                ttsContainer.style.right = '20px';
+                ttsContainer.style.left = 'auto';
+                ttsImg.style.transform = 'scaleX(1)';
+            }
+
+            // Mostra personagem
+            ttsContainer.classList.add('show');
+
+            // Fala
+            const utterance = new SpeechSynthesisUtterance(data.text);
+            utterance.lang = 'pt-BR';
+            
+            utterance.onend = () => {
+                ttsContainer.classList.remove('show');
+            };
+            
+            utterance.onerror = () => {
+                ttsContainer.classList.remove('show');
+            };
+
+            window.speechSynthesis.speak(utterance);
+        });
     </script>
 </body>
 </html>

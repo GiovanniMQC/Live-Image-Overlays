@@ -505,6 +505,10 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('character:speak', (data) => {
+        socket.broadcast.emit('character:speak', data);
+    });
+
     socket.on('media:delete', (data) => {
         if (appState[data.id]) {
             const url = appState[data.id].url;

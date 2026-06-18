@@ -745,6 +745,30 @@
         </div>
 
         <div class="tool-container">
+            <button class="tool-btn" title="Personagem TTS" onclick="toggleToolPanel('panel-tts', this)">🗣️</button>
+            <div id="panel-tts" class="tool-panel">
+                <h3>🗣️ Personagem (TTS)</h3>
+                <div class="input-group">
+                    <label>Imagem do Personagem (PNG)</label>
+                    <input type="file" id="tts-image-file" accept="image/png,image/gif,image/webp,image/jpeg" style="margin-bottom: 5px;">
+                    <input type="text" id="tts-image-url" placeholder="Ou cole a URL da imagem aqui...">
+                </div>
+                <div class="input-group">
+                    <label>Posição na Tela</label>
+                    <select id="tts-position" style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; cursor: pointer;">
+                        <option value="right">Canto Inferior Direito</option>
+                        <option value="left">Canto Inferior Esquerdo</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Texto para Falar</label>
+                    <textarea id="tts-text" rows="3" placeholder="Digite o que o personagem vai falar..." style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; width: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+                </div>
+                <button id="btn-tts-speak" class="btn-success" style="width: 100%; margin-top: 5px; padding: 10px; font-weight: bold;">Falar 🔊</button>
+            </div>
+        </div>
+
+        <div class="tool-container">
             <button class="tool-btn" title="Ajuda e Atalhos" onclick="toggleToolPanel('panel-help', this)">❓</button>
             <div id="panel-help" class="tool-panel">
                 <h3>❓ Atalhos e Ajuda</h3>
@@ -3779,6 +3803,60 @@
                     console.error("Erro ao adicionar ICE candidate", e);
                 }
             }
+        });
+        // --- TTS Character Logic ---
+        const ttsImageFile = document.getElementById('tts-image-file');
+        const ttsImageUrl = document.getElementById('tts-image-url');
+        const ttsPosition = document.getElementById('tts-position');
+        const ttsText = document.getElementById('tts-text');
+        const btnTtsSpeak = document.getElementById('btn-tts-speak');
+
+        // Handle TTS image upload
+        ttsImageFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const overlay = document.getElementById('upload-overlay');
+                document.getElementById('upload-text').innerText = "Enviando imagem do TTS...";
+                overlay.classList.add('show');
+
+                fetch('/upload', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    overlay.classList.remove('show');
+                    if (data.url) {
+                        ttsImageUrl.value = data.url;
+                    }
+                })
+                .catch(err => {
+                    overlay.classList.remove('show');
+                    alert('Erro no upload da imagem do TTS.');
+                });
+            }
+        });
+
+        // Handle Speak button click
+        btnTtsSpeak.addEventListener('click', () => {
+            const text = ttsText.value.trim();
+            if (!text) {
+                alert('Digite um texto para o personagem falar.');
+                return;
+            }
+
+            const imageUrl = ttsImageUrl.value.trim();
+            const position = ttsPosition.value;
+
+            socket.emit('character:speak', {
+                text: text,
+                imageUrl: imageUrl,
+                position: position
+            });
+
+            // Optional: clear text after speaking
+            ttsText.value = '';
+            document.getElementById('panel-tts').classList.remove('active');
         });
         // =======================================================
 
