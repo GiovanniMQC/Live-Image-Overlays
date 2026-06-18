@@ -856,6 +856,16 @@
                 <label>Nome do Áudio</label>
                 <input type="text" id="edit-audio-name" style="padding: 10px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 14px;">
             </div>
+            <div style="display: flex; gap: 10px;">
+                <div class="input-group" style="flex: 1;">
+                    <label>Início (seg)</label>
+                    <input type="number" id="edit-audio-trim-start" step="0.1" min="0" placeholder="0" style="padding: 10px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 14px; width: 100%; box-sizing: border-box;">
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <label>Fim (seg)</label>
+                    <input type="number" id="edit-audio-trim-end" step="0.1" min="0" placeholder="Fim" style="padding: 10px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 14px; width: 100%; box-sizing: border-box;">
+                </div>
+            </div>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <button id="btn-save-audio" style="flex: 1; padding: 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Salvar</button>
                 <button id="btn-cancel-audio" style="flex: 1; padding: 10px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Cancelar</button>
@@ -942,10 +952,30 @@
                 </select>
             </div>
             <div class="input-group">
+                <label style="display: flex; justify-content: space-between;">
+                    Áudio Customizado (Opcional)
+                    <button id="btn-tts-clear-audio" style="background: none; border: none; color: #dc3545; cursor: pointer; text-decoration: underline; font-size: 12px; padding: 0;">Limpar</button>
+                </label>
+                <input type="file" id="tts-audio-file" accept="audio/*" style="margin-bottom: 5px;">
+                <input type="text" id="tts-audio-url" placeholder="Ou cole a URL do áudio aqui...">
+            </div>
+            <div class="input-group">
+                <label>Ordem de Reprodução</label>
+                <select id="tts-audio-behavior" style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; cursor: pointer;">
+                    <option value="simultaneous">Simultâneo (Padrão)</option>
+                    <option value="audio_only">Apenas Áudio</option>
+                    <option value="audio_before">Áudio antes do Texto</option>
+                    <option value="audio_after">Áudio depois do Texto</option>
+                </select>
+            </div>
+            <div class="input-group">
                 <label>Texto para Falar</label>
                 <textarea id="tts-text" rows="3" placeholder="Digite o que o personagem vai falar..." style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; width: 100%; box-sizing: border-box; resize: vertical;"></textarea>
             </div>
-            <button id="btn-tts-speak" class="btn-success" style="width: 100%; margin-top: 5px; padding: 10px; font-weight: bold;">Falar 🔊</button>
+            <div style="display: flex; gap: 10px; margin-top: 5px;">
+                <button id="btn-tts-speak" class="btn-success" style="flex: 2; padding: 10px; font-weight: bold;">Falar 🔊</button>
+                <button id="btn-tts-stop" style="flex: 1; padding: 10px; font-weight: bold; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Parar ⏹️</button>
+            </div>
         </div>
     </div>
 
@@ -1659,6 +1689,8 @@
             currentEditAudioId = id;
             document.getElementById('edit-audio-icon').value = audio.icon || '';
             document.getElementById('edit-audio-name').value = audio.name || '';
+            document.getElementById('edit-audio-trim-start').value = audio.trimStart !== undefined && audio.trimStart !== null ? audio.trimStart : '';
+            document.getElementById('edit-audio-trim-end').value = audio.trimEnd !== undefined && audio.trimEnd !== null ? audio.trimEnd : '';
             document.getElementById('audio-edit-modal').style.display = 'flex';
         }
 
@@ -1670,11 +1702,18 @@
             if (!currentEditAudioId) return;
             const newIcon = document.getElementById('edit-audio-icon').value;
             const newName = document.getElementById('edit-audio-name').value;
+            const newTrimStart = document.getElementById('edit-audio-trim-start').value;
+            const newTrimEnd = document.getElementById('edit-audio-trim-end').value;
             
             fetch(`/api/audio-update/${currentEditAudioId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newName, icon: newIcon })
+                body: JSON.stringify({ 
+                    name: newName, 
+                    icon: newIcon,
+                    trimStart: newTrimStart === '' ? null : Number(newTrimStart),
+                    trimEnd: newTrimEnd === '' ? null : Number(newTrimEnd)
+                })
             })
             .then(res => res.json())
             .then(data => {
@@ -1683,6 +1722,8 @@
                     if (audio) {
                         audio.name = newName;
                         audio.icon = newIcon;
+                        audio.trimStart = newTrimStart === '' ? null : Number(newTrimStart);
+                        audio.trimEnd = newTrimEnd === '' ? null : Number(newTrimEnd);
                     }
                     renderAudioGrid();
                 }
@@ -1724,7 +1765,11 @@
 
             btn.innerHTML = `<span class="sound-icon">${audio.icon || '🎵'}</span><span>${audio.name}</span>`;
             btn.onclick = () => {
-                socket.emit('audio:play', { url: audio.url, currentTime: 0 });
+                socket.emit('audio:play', { 
+                    url: audio.url, 
+                    currentTime: audio.trimStart || 0,
+                    trimEnd: audio.trimEnd || null
+                });
             };
 
             const editBtn = document.createElement('button');
@@ -1889,6 +1934,14 @@
         }
 
         globalAudio.addEventListener('timeupdate', () => {
+            if (globalAudio.dataset.trimEnd) {
+                const trimEnd = parseFloat(globalAudio.dataset.trimEnd);
+                if (globalAudio.currentTime >= trimEnd) {
+                    globalAudio.dataset.trimEnd = '';
+                    socket.emit('audio:pause', { currentTime: 0 });
+                }
+            }
+
             if (globalAudio.duration) {
                 const progress = (globalAudio.currentTime / globalAudio.duration) * 100;
                 if (document.activeElement !== playerSeek) {
@@ -1935,7 +1988,11 @@
         btnPlayerPlayPause.addEventListener('click', () => {
             if (!globalAudio.src || globalAudio.src === window.location.href) return;
             if (globalAudio.paused) {
-                socket.emit('audio:play', { url: globalAudio.src, currentTime: globalAudio.currentTime });
+                socket.emit('audio:play', { 
+                    url: globalAudio.src, 
+                    currentTime: globalAudio.currentTime,
+                    trimEnd: globalAudio.dataset.trimEnd ? parseFloat(globalAudio.dataset.trimEnd) : null
+                });
             } else {
                 socket.emit('audio:pause', { currentTime: globalAudio.currentTime });
             }
@@ -1954,6 +2011,11 @@
 
         function playAudioWithState(data) {
             if (data.volume !== undefined) globalAudio.volume = data.volume;
+            if (data.trimEnd) {
+                globalAudio.dataset.trimEnd = data.trimEnd;
+            } else {
+                globalAudio.dataset.trimEnd = '';
+            }
 
             const btnWebrtc = document.getElementById('btn-webrtc');
             if (btnWebrtc && btnWebrtc.classList.contains('active')) {
@@ -3844,9 +3906,20 @@
         // --- TTS Character Logic ---
         const ttsImageFile = document.getElementById('tts-image-file');
         const ttsImageUrl = document.getElementById('tts-image-url');
+        const ttsAudioFile = document.getElementById('tts-audio-file');
+        const ttsAudioUrl = document.getElementById('tts-audio-url');
+        const ttsAudioBehavior = document.getElementById('tts-audio-behavior');
         const ttsPosition = document.getElementById('tts-position');
         const ttsText = document.getElementById('tts-text');
         const btnTtsSpeak = document.getElementById('btn-tts-speak');
+        const btnTtsStop = document.getElementById('btn-tts-stop');
+        const btnTtsClearAudio = document.getElementById('btn-tts-clear-audio');
+
+        // Handle TTS clear audio
+        btnTtsClearAudio.addEventListener('click', () => {
+            ttsAudioFile.value = '';
+            ttsAudioUrl.value = '';
+        });
 
         // Handle TTS image upload
         ttsImageFile.addEventListener('change', (e) => {
@@ -3874,26 +3947,62 @@
             }
         });
 
+        // Handle TTS audio upload
+        ttsAudioFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const overlay = document.getElementById('upload-overlay');
+                document.getElementById('upload-text').innerText = "Enviando áudio do TTS...";
+                overlay.classList.add('show');
+
+                fetch('/upload-audio', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    overlay.classList.remove('show');
+                    if (data.url) {
+                        ttsAudioUrl.value = data.url;
+                    }
+                })
+                .catch(err => {
+                    overlay.classList.remove('show');
+                    alert('Erro no upload do áudio do TTS.');
+                });
+            }
+        });
+
         // Handle Speak button click
         btnTtsSpeak.addEventListener('click', () => {
             const text = ttsText.value.trim();
-            if (!text) {
-                alert('Digite um texto para o personagem falar.');
+            const audioUrl = ttsAudioUrl.value.trim();
+            
+            if (!text && !audioUrl) {
+                alert('Digite um texto ou adicione um áudio para o personagem falar.');
                 return;
             }
 
             const imageUrl = ttsImageUrl.value.trim();
             const position = ttsPosition.value;
+            const behavior = ttsAudioBehavior.value;
 
             socket.emit('character:speak', {
                 text: text,
                 imageUrl: imageUrl,
-                position: position
+                position: position,
+                audioUrl: audioUrl,
+                audioBehavior: behavior
             });
 
             // Optional: clear text after speaking
             ttsText.value = '';
             document.getElementById('tts-sidebar').classList.remove('open');
+        });
+
+        // Handle Stop button click
+        btnTtsStop.addEventListener('click', () => {
+            socket.emit('character:stop');
         });
         // =======================================================
 

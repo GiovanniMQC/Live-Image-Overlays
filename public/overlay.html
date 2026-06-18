@@ -154,6 +154,11 @@
 
         function playAudioWithState(data) {
             if (data.volume !== undefined) globalAudio.volume = data.volume;
+            if (data.trimEnd) {
+                globalAudio.dataset.trimEnd = data.trimEnd;
+            } else {
+                globalAudio.dataset.trimEnd = '';
+            }
 
             const playNow = () => {
                 try { 
@@ -240,6 +245,16 @@
 
         globalAudio.addEventListener('ended', () => {
             socket.emit('audio:pause', { currentTime: 0 });
+        });
+
+        globalAudio.addEventListener('timeupdate', () => {
+            if (globalAudio.dataset.trimEnd) {
+                const trimEnd = parseFloat(globalAudio.dataset.trimEnd);
+                if (globalAudio.currentTime >= trimEnd) {
+                    globalAudio.dataset.trimEnd = '';
+                    socket.emit('audio:pause', { currentTime: 0 });
+                }
+            }
         });
 
         socket.on('audio:volume', (data) => {
@@ -511,9 +526,15 @@
         const ttsContainer = document.getElementById('tts-character-container');
         const ttsImg = document.getElementById('tts-character-img');
         
+        let currentTtsAudio = null;
+
         socket.on('character:speak', (data) => {
             // Cancela qualquer fala anterior
             window.speechSynthesis.cancel();
+            if (currentTtsAudio) {
+                currentTtsAudio.pause();
+                currentTtsAudio = null;
+            }
 
             // Atualiza imagem
             if (data.imageUrl) {
@@ -537,19 +558,78 @@
             // Mostra personagem
             ttsContainer.classList.add('show');
 
-            // Fala
-            const utterance = new SpeechSynthesisUtterance(data.text);
-            utterance.lang = 'pt-BR';
-            
-            utterance.onend = () => {
-                ttsContainer.classList.remove('show');
-            };
-            
-            utterance.onerror = () => {
+            const hasText = !!data.text;
+            const hasAudio = !!data.audioUrl;
+            const behavior = data.audioBehavior || 'simultaneous'; // simultaneous, audio_only, audio_before, audio_after
+
+            const hideCharacter = () => {
                 ttsContainer.classList.remove('show');
             };
 
-            window.speechSynthesis.speak(utterance);
+            const speakText = (onFinish) => {
+                if (!hasText) {
+                    if (onFinish) onFinish();
+                    return;
+                }
+                const utterance = new SpeechSynthesisUtterance(data.text);
+                utterance.lang = 'pt-BR';
+                utterance.onend = () => { if (onFinish) onFinish(); };
+                utterance.onerror = () => { if (onFinish) onFinish(); };
+                window.speechSynthesis.speak(utterance);
+            };
+
+            const playAudio = (onFinish) => {
+                if (!hasAudio) {
+                    if (onFinish) onFinish();
+                    return;
+                }
+                currentTtsAudio = new Audio(data.audioUrl);
+                currentTtsAudio.onended = () => {
+                    currentTtsAudio = null;
+                    if (onFinish) onFinish();
+                };
+                currentTtsAudio.onerror = () => {
+                    currentTtsAudio = null;
+                    if (onFinish) onFinish();
+                };
+                currentTtsAudio.play().catch(e => {
+                    console.error("Erro ao tocar áudio do TTS:", e);
+                    currentTtsAudio = null;
+                    if (onFinish) onFinish();
+                });
+            };
+
+            if (behavior === 'audio_only' || (!hasText && hasAudio)) {
+                playAudio(hideCharacter);
+            } else if (!hasAudio) {
+                speakText(hideCharacter);
+            } else if (behavior === 'audio_before') {
+                playAudio(() => {
+                    speakText(hideCharacter);
+                });
+            } else if (behavior === 'audio_after') {
+                speakText(() => {
+                    playAudio(hideCharacter);
+                });
+            } else {
+                // simultaneous
+                let finishedCount = 0;
+                const checkDone = () => {
+                    finishedCount++;
+                    if (finishedCount === 2) hideCharacter();
+                };
+                speakText(checkDone);
+                playAudio(checkDone);
+            }
+        });
+
+        socket.on('character:stop', () => {
+            window.speechSynthesis.cancel();
+            if (currentTtsAudio) {
+                currentTtsAudio.pause();
+                currentTtsAudio = null;
+            }
+            ttsContainer.classList.remove('show');
         });
     </script>
 </body>

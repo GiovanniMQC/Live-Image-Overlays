@@ -74,7 +74,9 @@
     "name": "Risada Sapo",
     "icon": "🐸",
     "url": "/audio_uploads/frog-laughing-meme.mp3",
-    "pinned": false
+    "pinned": false,
+    "trimStart": 1.15,
+    "trimEnd": null
   },
   {
     "id": "up-1781024144491zp0bo00",
@@ -116,13 +118,29 @@
     "name": "Cano caindo",
     "icon": "🪈",
     "url": "/audio_uploads/metal%20pipe%20falling%20sound%20effect.mp3",
-    "pinned": false
+    "pinned": false,
+    "trimStart": 0.75,
+    "trimEnd": null
   },
   {
     "id": "up-1781025002190vaqwbca",
     "name": "Tonc naruto",
     "icon": "🎌",
     "url": "/audio_uploads/Awkward%20Moment%20Anime%20Sound%20%20%20Sound%20Effect%20for%20editing.mp3",
+    "pinned": false
+  },
+  {
+    "id": "up-17818239067362y3h71a",
+    "name": "chicocarvalho",
+    "icon": "🎵",
+    "url": "/audio_uploads/chicocarvalho.mp3",
+    "pinned": false
+  },
+  {
+    "id": "up-1781823906736gp71925",
+    "name": "ze",
+    "icon": "🎵",
+    "url": "/audio_uploads/ze.mp3",
     "pinned": false
   }
 ]

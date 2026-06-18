@@ -178,13 +178,15 @@ app.get('/api/audio-list', (req, res) => {
 // Atualizar propriedades de um áudio
 app.post('/api/audio-update/:id', (req, res) => {
     const id = req.params.id;
-    const { name, icon, pinned } = req.body;
+    const { name, icon, pinned, trimStart, trimEnd } = req.body;
     
     const audio = audioList.find(a => a.id === id);
     if (audio) {
         if (name !== undefined) audio.name = name;
         if (icon !== undefined) audio.icon = icon;
         if (pinned !== undefined) audio.pinned = pinned;
+        if (trimStart !== undefined) audio.trimStart = trimStart;
+        if (trimEnd !== undefined) audio.trimEnd = trimEnd;
         saveAudioDb();
         res.json({ success: true, audio });
     } else {
@@ -507,6 +509,10 @@ io.on('connection', (socket) => {
 
     socket.on('character:speak', (data) => {
         socket.broadcast.emit('character:speak', data);
+    });
+
+    socket.on('character:stop', () => {
+        socket.broadcast.emit('character:stop');
     });
 
     socket.on('media:delete', (data) => {
