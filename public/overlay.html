@@ -52,19 +52,77 @@
         /* TTS Character */
         #tts-character-container {
             position: fixed;
-            bottom: -400px;
-            transition: bottom 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             z-index: 99999;
             pointer-events: none;
+            opacity: 0;
+            
+            /* Posições dinâmicas */
+            top: var(--tts-hidden-top, auto);
+            bottom: var(--tts-hidden-bottom, -400px);
+            left: var(--tts-hidden-left, auto);
+            right: var(--tts-hidden-right, 20px);
+            transform: var(--tts-hidden-transform, none);
+
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         #tts-character-container.show {
-            bottom: 20px;
+            top: var(--tts-show-top, auto);
+            bottom: var(--tts-show-bottom, 20px);
+            left: var(--tts-show-left, auto);
+            right: var(--tts-show-right, 20px);
+            transform: var(--tts-show-transform, none);
+            opacity: 1;
         }
         #tts-character-container img {
             max-height: 300px;
             max-width: 300px;
             object-fit: contain;
             filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.5));
+        }
+
+        #tts-subtitle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 150%;
+            text-align: center;
+            font-size: 28px;
+            font-weight: 900;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+            text-shadow: 
+                2px 2px 0 #000, 
+                -2px -2px 0 #000, 
+                2px -2px 0 #000, 
+                -2px 2px 0 #000,
+                0px 4px 10px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #tts-subtitle span {
+            display: inline-block;
+            transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.15s ease-out, color 0.15s ease-out;
+            margin-right: 8px;
+        }
+
+        .tts-word-hidden {
+            opacity: 0;
+            transform: translateY(20px);
+            color: #fff;
+        }
+
+        .tts-word-visible {
+            opacity: 1;
+            transform: translateY(0);
+            color: #fff;
+        }
+
+        .tts-word-active {
+            opacity: 1;
+            transform: translateY(0);
+            color: #ffd700;
         }
     </style>
 </head>
@@ -73,6 +131,7 @@
     
     <div id="tts-character-container">
         <img id="tts-character-img" src="" alt="Character">
+        <div id="tts-subtitle"></div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -252,6 +311,7 @@
                 const trimEnd = parseFloat(globalAudio.dataset.trimEnd);
                 if (globalAudio.currentTime >= trimEnd) {
                     globalAudio.dataset.trimEnd = '';
+                    globalAudio.pause();
                     socket.emit('audio:pause', { currentTime: 0 });
                 }
             }
@@ -525,8 +585,10 @@
         // --- TTS Character Logic ---
         const ttsContainer = document.getElementById('tts-character-container');
         const ttsImg = document.getElementById('tts-character-img');
+        const ttsSubtitle = document.getElementById('tts-subtitle');
         
         let currentTtsAudio = null;
+        let currentSubtitleTimeout = null;
 
         socket.on('character:speak', (data) => {
             // Cancela qualquer fala anterior
@@ -544,14 +606,62 @@
                 ttsImg.src = "https://cdn-icons-png.flaticon.com/512/4712/4712010.png";
             }
 
+            ttsContainer.style.left = '';
+            ttsContainer.style.right = '';
+            ttsContainer.style.top = '';
+            ttsContainer.style.bottom = '';
+            ttsContainer.style.transform = '';
+
+            // Cor da Legenda
+            if (data.subtitleColor) {
+                document.documentElement.style.setProperty('--tts-active-color', data.subtitleColor);
+            }
+
             // Posição
             if (data.position === 'left') {
-                ttsContainer.style.left = '20px';
-                ttsContainer.style.right = 'auto';
-                ttsImg.style.transform = 'scaleX(-1)'; // Vira o personagem para olhar para o centro
+                ttsContainer.style.setProperty('--tts-hidden-top', 'auto');
+                ttsContainer.style.setProperty('--tts-hidden-bottom', '-400px');
+                ttsContainer.style.setProperty('--tts-hidden-left', '20px');
+                ttsContainer.style.setProperty('--tts-hidden-right', 'auto');
+                ttsContainer.style.setProperty('--tts-hidden-transform', 'none');
+
+                ttsContainer.style.setProperty('--tts-show-top', 'auto');
+                ttsContainer.style.setProperty('--tts-show-bottom', '20px');
+                ttsContainer.style.setProperty('--tts-show-left', '20px');
+                ttsContainer.style.setProperty('--tts-show-right', 'auto');
+                ttsContainer.style.setProperty('--tts-show-transform', 'none');
+                
+                ttsImg.style.transform = 'scaleX(-1)';
+            } else if (data.position === 'custom') {
+                const cx = data.customX !== undefined ? data.customX : 80;
+                const cy = data.customY !== undefined ? data.customY : 80;
+                
+                ttsContainer.style.setProperty('--tts-hidden-top', '150%');
+                ttsContainer.style.setProperty('--tts-hidden-bottom', 'auto');
+                ttsContainer.style.setProperty('--tts-hidden-left', cx + '%');
+                ttsContainer.style.setProperty('--tts-hidden-right', 'auto');
+                ttsContainer.style.setProperty('--tts-hidden-transform', 'translate(-50%, -50%)');
+
+                ttsContainer.style.setProperty('--tts-show-top', cy + '%');
+                ttsContainer.style.setProperty('--tts-show-bottom', 'auto');
+                ttsContainer.style.setProperty('--tts-show-left', cx + '%');
+                ttsContainer.style.setProperty('--tts-show-right', 'auto');
+                ttsContainer.style.setProperty('--tts-show-transform', 'translate(-50%, -50%)');
+                
+                ttsImg.style.transform = data.customFlip ? 'scaleX(-1)' : 'scaleX(1)';
             } else {
-                ttsContainer.style.right = '20px';
-                ttsContainer.style.left = 'auto';
+                ttsContainer.style.setProperty('--tts-hidden-top', 'auto');
+                ttsContainer.style.setProperty('--tts-hidden-bottom', '-400px');
+                ttsContainer.style.setProperty('--tts-hidden-left', 'auto');
+                ttsContainer.style.setProperty('--tts-hidden-right', '20px');
+                ttsContainer.style.setProperty('--tts-hidden-transform', 'none');
+
+                ttsContainer.style.setProperty('--tts-show-top', 'auto');
+                ttsContainer.style.setProperty('--tts-show-bottom', '20px');
+                ttsContainer.style.setProperty('--tts-show-left', 'auto');
+                ttsContainer.style.setProperty('--tts-show-right', '20px');
+                ttsContainer.style.setProperty('--tts-show-transform', 'none');
+
                 ttsImg.style.transform = 'scaleX(1)';
             }
 
@@ -564,6 +674,7 @@
 
             const hideCharacter = () => {
                 ttsContainer.classList.remove('show');
+                ttsSubtitle.classList.remove('show');
             };
 
             const speakText = (onFinish) => {
@@ -571,10 +682,78 @@
                     if (onFinish) onFinish();
                     return;
                 }
+                
+                const regex = /\S+/g;
+                let match;
+                const words = [];
+                while ((match = regex.exec(data.text)) !== null) {
+                    words.push({
+                        text: match[0],
+                        startIndex: match.index
+                    });
+                }
+
+                let currentWordIndex = -1;
+                let currentChunkStartIndex = -1;
+
                 const utterance = new SpeechSynthesisUtterance(data.text);
                 utterance.lang = 'pt-BR';
-                utterance.onend = () => { if (onFinish) onFinish(); };
-                utterance.onerror = () => { if (onFinish) onFinish(); };
+                
+                utterance.onboundary = (event) => {
+                    if (event.name !== 'word') return;
+                    
+                    let spokenWordIndex = -1;
+                    for (let i = words.length - 1; i >= 0; i--) {
+                        if (event.charIndex >= words[i].startIndex) {
+                            spokenWordIndex = i;
+                            break;
+                        }
+                    }
+
+                    if (spokenWordIndex !== -1 && spokenWordIndex !== currentWordIndex) {
+                        currentWordIndex = spokenWordIndex;
+                        
+                        const chunkStartIndex = Math.floor(spokenWordIndex / 3) * 3;
+                        
+                        if (chunkStartIndex !== currentChunkStartIndex) {
+                            currentChunkStartIndex = chunkStartIndex;
+                            ttsSubtitle.innerHTML = '';
+                            
+                            for (let i = chunkStartIndex; i < chunkStartIndex + 3 && i < words.length; i++) {
+                                const span = document.createElement('span');
+                                span.innerText = words[i].text + ' ';
+                                span.id = 'tts-word-' + i;
+                                span.className = 'tts-word-hidden';
+                                ttsSubtitle.appendChild(span);
+                            }
+                        }
+
+                        // Atualiza as classes das palavras do chunk atual
+                        for (let i = chunkStartIndex; i < chunkStartIndex + 3 && i < words.length; i++) {
+                            const span = document.getElementById('tts-word-' + i);
+                            if (span) {
+                                if (i < spokenWordIndex) {
+                                    span.className = 'tts-word-visible';
+                                } else if (i === spokenWordIndex) {
+                                    setTimeout(() => {
+                                        span.className = 'tts-word-active';
+                                    }, 10);
+                                } else {
+                                    span.className = 'tts-word-hidden';
+                                }
+                            }
+                        }
+                    }
+                };
+
+                utterance.onend = () => { 
+                    ttsSubtitle.innerHTML = '';
+                    if (onFinish) onFinish(); 
+                };
+                utterance.onerror = () => { 
+                    ttsSubtitle.innerHTML = '';
+                    if (onFinish) onFinish(); 
+                };
                 window.speechSynthesis.speak(utterance);
             };
 
@@ -630,6 +809,7 @@
                 currentTtsAudio = null;
             }
             ttsContainer.classList.remove('show');
+            if (ttsSubtitle) ttsSubtitle.classList.remove('show');
         });
     </script>
 </body>

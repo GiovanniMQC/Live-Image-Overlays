@@ -945,11 +945,30 @@
                 <input type="text" id="tts-image-url" placeholder="Ou cole a URL da imagem aqui...">
             </div>
             <div class="input-group">
-                <label>Posição na Tela</label>
-                <select id="tts-position" style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; cursor: pointer;">
+                <label style="display: flex; justify-content: space-between; align-items: center;">
+                    Posição na Tela
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <span style="font-size: 12px;">Cor Legenda:</span>
+                        <input type="color" id="tts-subtitle-color" value="#ffd700" style="padding: 0; border: none; width: 24px; height: 24px; cursor: pointer; background: none;">
+                    </div>
+                </label>
+                <select id="tts-position" style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; cursor: pointer; width: 100%;">
                     <option value="right">Canto Inferior Direito</option>
                     <option value="left">Canto Inferior Esquerdo</option>
+                    <option value="custom">Personalizado (Arrastar)</option>
                 </select>
+                <div id="tts-custom-position-container" style="display: none; flex-direction: column; gap: 5px; margin-top: 5px;">
+                    <span style="font-size: 12px; color: #aaa; text-align: center;">Pré-visualização (Isto não está aparecendo na live ainda)</span>
+                    <div id="tts-canvas" style="position: relative; width: 100%; aspect-ratio: 16 / 9; background: #222; border: 1px dashed #555; border-radius: 4px; overflow: hidden; cursor: crosshair;">
+                        <div id="tts-canvas-char" style="position: absolute; left: 80%; top: 80%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: rgba(0, 150, 255, 0.5); border: 2px solid #0096ff; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: grab; user-select: none;">🤖</div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #aaa; margin-top: 5px;">
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; margin: 0;">
+                            <input type="checkbox" id="tts-custom-flip" style="margin: 0;"> Virar Personagem
+                        </label>
+                        <span id="tts-canvas-coords">X: 80.0% Y: 80.0%</span>
+                    </div>
+                </div>
             </div>
             <div class="input-group">
                 <label style="display: flex; justify-content: space-between;">
@@ -3915,6 +3934,87 @@
         const btnTtsStop = document.getElementById('btn-tts-stop');
         const btnTtsClearAudio = document.getElementById('btn-tts-clear-audio');
 
+        const ttsSubtitleColor = document.getElementById('tts-subtitle-color');
+        const ttsCustomPosContainer = document.getElementById('tts-custom-position-container');
+        const ttsCanvas = document.getElementById('tts-canvas');
+        const ttsCanvasChar = document.getElementById('tts-canvas-char');
+        const ttsCanvasCoords = document.getElementById('tts-canvas-coords');
+        const ttsCustomFlip = document.getElementById('tts-custom-flip');
+
+        let customX = 80.0;
+        let customY = 80.0;
+
+        if (localStorage.getItem('ttsSubtitleColor')) {
+            ttsSubtitleColor.value = localStorage.getItem('ttsSubtitleColor');
+        }
+        if (localStorage.getItem('ttsCustomX')) {
+            customX = parseFloat(localStorage.getItem('ttsCustomX'));
+            customY = parseFloat(localStorage.getItem('ttsCustomY'));
+            updateCanvasCharPos();
+        }
+        if (localStorage.getItem('ttsCustomFlip') === 'true') {
+            ttsCustomFlip.checked = true;
+            updateCanvasCharPos();
+        }
+
+        ttsSubtitleColor.addEventListener('change', () => {
+            localStorage.setItem('ttsSubtitleColor', ttsSubtitleColor.value);
+        });
+
+        ttsPosition.addEventListener('change', () => {
+            if (ttsPosition.value === 'custom') {
+                ttsCustomPosContainer.style.display = 'flex';
+            } else {
+                ttsCustomPosContainer.style.display = 'none';
+            }
+        });
+        
+        // Inicializa exibição
+        if (ttsPosition.value === 'custom') ttsCustomPosContainer.style.display = 'flex';
+
+        ttsCustomFlip.addEventListener('change', () => {
+            localStorage.setItem('ttsCustomFlip', ttsCustomFlip.checked);
+            updateCanvasCharPos();
+        });
+
+        function updateCanvasCharPos() {
+            ttsCanvasChar.style.left = customX + '%';
+            ttsCanvasChar.style.top = customY + '%';
+            ttsCanvasCoords.innerText = `X: ${customX.toFixed(1)}% Y: ${customY.toFixed(1)}%`;
+            if (ttsCustomFlip.checked) {
+                ttsCanvasChar.style.transform = `translate(-50%, -50%) scaleX(-1)`;
+            } else {
+                ttsCanvasChar.style.transform = `translate(-50%, -50%) scaleX(1)`;
+            }
+        }
+
+        let isDraggingChar = false;
+        ttsCanvas.addEventListener('mousedown', (e) => {
+            isDraggingChar = true;
+            updatePosFromEvent(e);
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (isDraggingChar) updatePosFromEvent(e);
+        });
+        document.addEventListener('mouseup', () => {
+            if (isDraggingChar) {
+                isDraggingChar = false;
+                localStorage.setItem('ttsCustomX', customX);
+                localStorage.setItem('ttsCustomY', customY);
+            }
+        });
+
+        function updatePosFromEvent(e) {
+            const rect = ttsCanvas.getBoundingClientRect();
+            let x = ((e.clientX - rect.left) / rect.width) * 100;
+            let y = ((e.clientY - rect.top) / rect.height) * 100;
+            x = Math.max(0, Math.min(100, x));
+            y = Math.max(0, Math.min(100, y));
+            customX = x;
+            customY = y;
+            updateCanvasCharPos();
+        }
+
         // Handle TTS clear audio
         btnTtsClearAudio.addEventListener('click', () => {
             ttsAudioFile.value = '';
@@ -3992,7 +4092,11 @@
                 imageUrl: imageUrl,
                 position: position,
                 audioUrl: audioUrl,
-                audioBehavior: behavior
+                audioBehavior: behavior,
+                subtitleColor: ttsSubtitleColor.value,
+                customX: customX,
+                customY: customY,
+                customFlip: ttsCustomFlip.checked
             });
 
             // Optional: clear text after speaking
