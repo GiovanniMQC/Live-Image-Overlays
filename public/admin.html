@@ -575,6 +575,23 @@
         #media-sidebar.open {
             right: 0;
         }
+        #tts-sidebar {
+            position: fixed;
+            top: 0;
+            right: -350px;
+            width: 320px;
+            height: 100vh;
+            background: #1e1e1e;
+            border-left: 1px solid #444;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            transition: right 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.05);
+        }
+        #tts-sidebar.open {
+            right: 0;
+        }
         .media-preview-img {
             width: 100%;
             height: 60px;
@@ -745,27 +762,7 @@
         </div>
 
         <div class="tool-container">
-            <button class="tool-btn" title="Personagem TTS" onclick="toggleToolPanel('panel-tts', this)">🗣️</button>
-            <div id="panel-tts" class="tool-panel">
-                <h3>🗣️ Personagem (TTS)</h3>
-                <div class="input-group">
-                    <label>Imagem do Personagem (PNG)</label>
-                    <input type="file" id="tts-image-file" accept="image/png,image/gif,image/webp,image/jpeg" style="margin-bottom: 5px;">
-                    <input type="text" id="tts-image-url" placeholder="Ou cole a URL da imagem aqui...">
-                </div>
-                <div class="input-group">
-                    <label>Posição na Tela</label>
-                    <select id="tts-position" style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; cursor: pointer;">
-                        <option value="right">Canto Inferior Direito</option>
-                        <option value="left">Canto Inferior Esquerdo</option>
-                    </select>
-                </div>
-                <div class="input-group">
-                    <label>Texto para Falar</label>
-                    <textarea id="tts-text" rows="3" placeholder="Digite o que o personagem vai falar..." style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; width: 100%; box-sizing: border-box; resize: vertical;"></textarea>
-                </div>
-                <button id="btn-tts-speak" class="btn-success" style="width: 100%; margin-top: 5px; padding: 10px; font-weight: bold;">Falar 🔊</button>
-            </div>
+            <button class="tool-btn" title="Personagem TTS" onclick="toggleTtsSidebar()">🗣️</button>
         </div>
 
         <div class="tool-container">
@@ -923,6 +920,32 @@
         </div>
         <div class="soundpad-grid" id="media-grid">
             <!-- Botões inseridos via JS -->
+        </div>
+    </div>
+
+    <div id="tts-sidebar">
+        <div class="soundpad-header">
+            <h2>🗣️ Personagem (TTS)</h2>
+            <button class="btn-close-soundpad" onclick="toggleTtsSidebar()">✖</button>
+        </div>
+        <div class="soundpad-controls">
+            <div class="input-group">
+                <label>Imagem do Personagem (PNG)</label>
+                <input type="file" id="tts-image-file" accept="image/png,image/gif,image/webp,image/jpeg" style="margin-bottom: 5px;">
+                <input type="text" id="tts-image-url" placeholder="Ou cole a URL da imagem aqui...">
+            </div>
+            <div class="input-group">
+                <label>Posição na Tela</label>
+                <select id="tts-position" style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; cursor: pointer;">
+                    <option value="right">Canto Inferior Direito</option>
+                    <option value="left">Canto Inferior Esquerdo</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Texto para Falar</label>
+                <textarea id="tts-text" rows="3" placeholder="Digite o que o personagem vai falar..." style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; width: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+            </div>
+            <button id="btn-tts-speak" class="btn-success" style="width: 100%; margin-top: 5px; padding: 10px; font-weight: bold;">Falar 🔊</button>
         </div>
     </div>
 
@@ -1359,6 +1382,12 @@
 
         function toggleMediaSidebar() {
             document.getElementById('media-sidebar').classList.toggle('open');
+            document.querySelectorAll('.tool-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        }
+
+        function toggleTtsSidebar() {
+            document.getElementById('tts-sidebar').classList.toggle('open');
             document.querySelectorAll('.tool-panel').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
         }
@@ -2186,7 +2215,7 @@
         let isSpacePressed = false;
         window.addEventListener('keydown', (e) => {
             // Previne atalhos se estiver digitando numa caixa de texto ou elemento de texto editável
-            if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.isContentEditable)) return;
+            if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) return;
 
             if (e.key === 'Delete' && selectedElements.size > 0) {
                 selectedElements.forEach(id => {
@@ -2347,7 +2376,7 @@
                     
                     clearSelection();
                     
-                    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.isContentEditable)) {
+                    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
                         document.activeElement.blur();
                     }
                 } else if (e.button === 0) { // Left click normal para Marquee
@@ -2362,7 +2391,7 @@
                     marqueeBox.style.width = '0px';
                     marqueeBox.style.height = '0px';
                     
-                    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.isContentEditable)) {
+                    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
                         document.activeElement.blur();
                     }
                 }
@@ -3087,7 +3116,7 @@
                 if (mediaEl.contentEditable === "true") return;
                 
                 // Tira o foco de caixas de texto para permitir os atalhos de teclado funcionarem
-                if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+                if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
                     document.activeElement.blur();
                 }
 
@@ -3856,7 +3885,7 @@
 
             // Optional: clear text after speaking
             ttsText.value = '';
-            document.getElementById('panel-tts').classList.remove('active');
+            document.getElementById('tts-sidebar').classList.remove('open');
         });
         // =======================================================
 
