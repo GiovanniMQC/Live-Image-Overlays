@@ -168,29 +168,27 @@
             flex-grow: 1;
             overflow: auto;
             background: #1a1a1a;
-            /* Padrão de grade */
-            background-image: linear-gradient(#2a2a2a 1px, transparent 1px),
-                              linear-gradient(90deg, #2a2a2a 1px, transparent 1px);
-            background-size: 50px 50px;
-            background-position: top left;
         }
 
         /* Envolve o canvas virtual para garantir que o scroll do workspace funcione com o scale */
         #canvas-wrapper {
-            position: absolute;
-            width: calc((var(--obs-width) + var(--canvas-padding) * 2));
-            height: calc((var(--obs-height) + var(--canvas-padding) * 2));
-            transform-origin: top left;
-            /* O transform scale será aplicado aqui via JS */
+            position: relative;
+            /* width e height serão aplicados no JS acompanhando o scale para zerar a rolagem fantasma */
         }
 
         /* O Canvas virtual total com a área extra de "bastidores" */
         #virtual-canvas {
             position: absolute;
-            width: 100%;
-            height: 100%;
+            width: calc(var(--obs-width) + var(--canvas-padding) * 2);
+            height: calc(var(--obs-height) + var(--canvas-padding) * 2);
             top: 0;
             left: 0;
+            transform-origin: top left;
+            /* Padrão de grade transferido para cá para acompanhar pan e zoom */
+            background-image: linear-gradient(#2a2a2a 1px, transparent 1px),
+                              linear-gradient(90deg, #2a2a2a 1px, transparent 1px);
+            background-size: 40px 40px;
+            background-position: top left;
         }
 
         /* A área exata que o OBS captura */
@@ -202,7 +200,7 @@
             left: var(--canvas-padding);
             top: var(--canvas-padding);
             border: 2px dashed #ff0055;
-            box-shadow: 0 0 50px rgba(255, 0, 85, 0.3) inset, 0 0 0 9999px rgba(0,0,0,0.5);
+            box-shadow: 0 0 50px rgba(255, 0, 85, 0.3) inset, 0 0 0 999999px rgba(0,0,0,0.5);
             pointer-events: none;
             overflow: hidden;
         }
@@ -655,20 +653,20 @@
                 <div id="marquee-box" style="position: absolute; border: 1px solid rgba(0, 123, 255, 0.8); background: rgba(0, 123, 255, 0.2); display: none; pointer-events: none; z-index: 99999;"></div>
                 <!-- Elementos inseridos aparecerão aqui -->
             </div>
-        </div>
         
-        <!-- UI Global de Seleção (Fora do scale da imagem) -->
-        <div id="selection-toolbar">
-            <button id="btn-ctx-layer-up" title="Trazer para Frente">⏫</button>
-            <button id="btn-ctx-layer-down" title="Enviar para Trás">⏬</button>
-            <button id="btn-ctx-hide" title="Ocultar/Mostrar">👁️ Ocultar</button>
-            <button id="btn-ctx-mute" class="video-only" title="Mudo/Áudio">🔊 Áudio</button>
-            <input type="range" id="ctx-video-seek" class="video-only" min="0" max="100" value="0">
-            <input type="range" id="ctx-opacity" min="0" max="1" step="0.01" value="1" title="Opacidade (Transparência)" style="width: 80px; cursor: pointer;">
-            <button id="btn-ctx-delete" class="danger" title="Excluir">🗑️ Excluir</button>
+            <!-- UI Global de Seleção (Fora do scale da imagem, mas movida para dentro do wrapper para acompanhar o alinhamento das margens) -->
+            <div id="selection-toolbar">
+                <button id="btn-ctx-layer-up" title="Trazer para Frente">⏫</button>
+                <button id="btn-ctx-layer-down" title="Enviar para Trás">⏬</button>
+                <button id="btn-ctx-hide" title="Ocultar/Mostrar">👁️ Ocultar</button>
+                <button id="btn-ctx-mute" class="video-only" title="Mudo/Áudio">🔊 Áudio</button>
+                <input type="range" id="ctx-video-seek" class="video-only" min="0" max="100" value="0">
+                <input type="range" id="ctx-opacity" min="0" max="1" step="0.01" value="1" title="Opacidade (Transparência)" style="width: 80px; cursor: pointer;">
+                <button id="btn-ctx-delete" class="danger" title="Excluir">🗑️ Excluir</button>
+            </div>
+            <div id="global-resize-handle"></div>
+            <div id="global-rotate-handle"></div>
         </div>
-        <div id="global-resize-handle"></div>
-        <div id="global-rotate-handle"></div>
     </div>
     
     <div id="audio-edit-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100000; align-items: center; justify-content: center;">
@@ -1645,28 +1643,69 @@
         const mediaState = {};
 
         // Controle de Zoom da Tela
-        function updateScale(newScale, focalX = null, focalY = null) {
+        function updateScale(newScale, mouseX = null, mouseY = null) {
+            let contentX = 0, contentY = 0;
+            
+            if (mouseX !== null && mouseY !== null) {
+                const rect = canvasWrapper.getBoundingClientRect();
+                contentX = mouseX - rect.left;
+                contentY = mouseY - rect.top;
+            }
+
             const oldScale = currentScale;
             currentScale = Math.max(0.05, Math.min(newScale, 2)); // 5% a 200%
             zoomLevelDisplay.innerText = Math.round(currentScale * 100) + '%';
             
-            // Applica o transform
-            canvasWrapper.style.transform = `scale(${currentScale})`;
+            // Applica o transform no virtual-canvas (internamente)
+            virtualCanvas.style.transform = `scale(${currentScale})`;
+            
+            const newWidth = (obsWidth + canvasPadding * 2) * currentScale;
+            const newHeight = (obsHeight + canvasPadding * 2) * currentScale;
+            
+            // O canvas-wrapper assume o tamanho real estrutural para sumir com as scrollbars desnecessárias
+            canvasWrapper.style.width = newWidth + 'px';
+            canvasWrapper.style.height = newHeight + 'px';
+
+            // Aplica as margens dinamicamente apenas quando a janela for maior que o canvas escalado
+            if (newWidth < workspace.clientWidth) {
+                canvasWrapper.style.marginLeft = `${(workspace.clientWidth - newWidth) / 2}px`;
+            } else {
+                canvasWrapper.style.marginLeft = '0px';
+            }
+
+            if (newHeight < workspace.clientHeight) {
+                canvasWrapper.style.marginTop = `${(workspace.clientHeight - newHeight) / 2}px`;
+            } else {
+                canvasWrapper.style.marginTop = '0px';
+            }
             
             // Se tivermos foco (posição do mouse no scroll), ajustamos o scroll do workspace para dar o zoom no ponto correto
-            if (focalX !== null && focalY !== null) {
+            if (mouseX !== null && mouseY !== null) {
                 // Cálculo para manter o mouse no mesmo ponto após o zoom
                 const scaleRatio = currentScale / oldScale;
-                const scrollX = workspace.scrollLeft;
-                const scrollY = workspace.scrollTop;
+                const newContentX = contentX * scaleRatio;
+                const newContentY = contentY * scaleRatio;
                 
-                workspace.scrollLeft = (scrollX + focalX) * scaleRatio - focalX;
-                workspace.scrollTop = (scrollY + focalY) * scaleRatio - focalY;
+                const rectWorkspace = workspace.getBoundingClientRect();
+                const mouseXInWorkspace = mouseX - rectWorkspace.left;
+                const mouseYInWorkspace = mouseY - rectWorkspace.top;
+                
+                const newMl = parseFloat(canvasWrapper.style.marginLeft) || 0;
+                const newMt = parseFloat(canvasWrapper.style.marginTop) || 0;
+
+                workspace.scrollLeft = newContentX - mouseXInWorkspace + newMl;
+                workspace.scrollTop = newContentY - mouseYInWorkspace + newMt;
             }
         }
 
-        document.getElementById('btn-zoom-in').addEventListener('click', () => updateScale(currentScale + 0.05));
-        document.getElementById('btn-zoom-out').addEventListener('click', () => updateScale(currentScale - 0.05));
+        // Função auxiliar para os botões de +/- focarem bem no centro visual atual do workspace
+        function getWorkspaceCenter() {
+            const rect = workspace.getBoundingClientRect();
+            return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+        }
+
+        document.getElementById('btn-zoom-in').addEventListener('click', () => { const c = getWorkspaceCenter(); updateScale(currentScale + 0.05, c.x, c.y); });
+        document.getElementById('btn-zoom-out').addEventListener('click', () => { const c = getWorkspaceCenter(); updateScale(currentScale - 0.05, c.x, c.y); });
 
         // Inicializa Zoom e Centraliza o OBS Bounds
         updateScale(currentScale);
@@ -2170,11 +2209,8 @@
             } else {
                 // Zoom na Tela (Canvas)
                 const zoomAmount = e.deltaY > 0 ? -0.05 : 0.05;
-                // Pegar posição do mouse relativa à janela para servir de âncora
-                const rect = workspace.getBoundingClientRect();
-                const focalX = e.clientX - rect.left;
-                const focalY = e.clientY - rect.top;
-                updateScale(currentScale + zoomAmount, focalX, focalY);
+                // Envia a posição real do mouse na tela para o zoom focar corretamente com as novas lógicas de alinhamento
+                updateScale(currentScale + zoomAmount, e.clientX, e.clientY);
             }
         }, { passive: false });
 
