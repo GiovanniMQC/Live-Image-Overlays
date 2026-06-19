@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -51,12 +52,13 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
             transition: all 0.2s;
             outline: none;
         }
 
-        .tool-btn:hover, .tool-btn.active {
+        .tool-btn:hover,
+        .tool-btn.active {
             background-color: #007bff;
             border-color: #0056b3;
             transform: scale(1.1);
@@ -74,7 +76,7 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.7);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7);
             opacity: 0;
             visibility: hidden;
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -104,7 +106,7 @@
             flex-direction: column;
             gap: 5px;
         }
-        
+
         .input-group label {
             font-size: 12px;
             color: #888;
@@ -127,7 +129,7 @@
             box-sizing: border-box;
             transition: border-color 0.2s;
         }
-        
+
         .tool-panel input[type="text"]:focus {
             border-color: #007bff;
         }
@@ -158,9 +160,17 @@
             width: 100%;
         }
 
-        .tool-panel button:hover { background-color: #0056b3; }
-        .tool-panel button.btn-success { background-color: #28a745; }
-        .tool-panel button.btn-success:hover { background-color: #218838; }
+        .tool-panel button:hover {
+            background-color: #0056b3;
+        }
+
+        .tool-panel button.btn-success {
+            background-color: #28a745;
+        }
+
+        .tool-panel button.btn-success:hover {
+            background-color: #218838;
+        }
 
         /* Container que permite rolar (pan) */
         #workspace {
@@ -186,7 +196,7 @@
             transform-origin: top left;
             /* Padrão de grade transferido para cá para acompanhar pan e zoom */
             background-image: linear-gradient(#2a2a2a 1px, transparent 1px),
-                              linear-gradient(90deg, #2a2a2a 1px, transparent 1px);
+                linear-gradient(90deg, #2a2a2a 1px, transparent 1px);
             background-size: 40px 40px;
             background-position: top left;
         }
@@ -200,11 +210,11 @@
             left: var(--canvas-padding);
             top: var(--canvas-padding);
             border: 2px dashed #ff0055;
-            box-shadow: 0 0 50px rgba(255, 0, 85, 0.3) inset, 0 0 0 999999px rgba(0,0,0,0.5);
+            box-shadow: 0 0 50px rgba(255, 0, 85, 0.3) inset, 0 0 0 999999px rgba(0, 0, 0, 0.5);
             pointer-events: none;
             overflow: hidden;
         }
-        
+
         #remoteVideo {
             position: absolute;
             z-index: -1;
@@ -251,11 +261,11 @@
             position: absolute;
             display: flex;
             gap: 8px;
-            background: rgba(0,0,0,0.95);
+            background: rgba(0, 0, 0, 0.95);
             padding: 8px 12px;
             border-radius: 8px;
             border: 1px solid #444;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
             transform: translate(0, -10px);
             z-index: 10000;
             opacity: 0;
@@ -263,6 +273,7 @@
             transition: opacity 0.2s, visibility 0.2s, transform 0.2s;
             align-items: center;
         }
+
         #selection-toolbar.show {
             opacity: 1;
             visibility: visible;
@@ -271,18 +282,54 @@
         }
 
         #selection-toolbar button {
-            background: #333; border: 1px solid #555; color: white; padding: 8px 12px;
-            border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;
-            display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.1s;
+            background: #333;
+            border: 1px solid #555;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.1s;
         }
-        #selection-toolbar button:hover { background: #4a4a4a; transform: scale(1.05); }
-        #selection-toolbar button.danger { background: #dc3545; border-color: #bd2130; }
-        #selection-toolbar button.danger:hover { background: #c82333; }
-        #selection-toolbar .video-only { display: none; }
-        #selection-toolbar.has-video .toolbar-group.video-only { display: flex; }
-        #selection-toolbar.has-video .toolbar-control-group.video-only { display: flex; }
-        #selection-toolbar.has-video .toolbar-divider.video-only { display: block; }
-        #selection-toolbar.has-video input.video-only { display: block; }
+
+        #selection-toolbar button:hover {
+            background: #4a4a4a;
+            transform: scale(1.05);
+        }
+
+        #selection-toolbar button.danger {
+            background: #dc3545;
+            border-color: #bd2130;
+        }
+
+        #selection-toolbar button.danger:hover {
+            background: #c82333;
+        }
+
+        #selection-toolbar .video-only {
+            display: none;
+        }
+
+        #selection-toolbar.has-video .toolbar-group.video-only {
+            display: flex;
+        }
+
+        #selection-toolbar.has-video .toolbar-control-group.video-only {
+            display: flex;
+        }
+
+        #selection-toolbar.has-video .toolbar-divider.video-only {
+            display: block;
+        }
+
+        #selection-toolbar.has-video input.video-only {
+            display: block;
+        }
 
         .toolbar-group {
             display: flex;
@@ -306,11 +353,13 @@
             border-radius: 6px;
             border: 1px solid #444;
         }
+
         .toolbar-control-group span {
             font-size: 14px;
             pointer-events: none;
             color: #ccc;
         }
+
         #selection-toolbar input[type="range"] {
             cursor: pointer;
             accent-color: #007bff;
@@ -321,14 +370,14 @@
             outline: none;
             margin: 0;
         }
-        
+
         /* WebKit Track */
         #selection-toolbar input[type="range"]::-webkit-slider-runnable-track {
             height: 4px;
             background: #555;
             border-radius: 2px;
         }
-        
+
         /* WebKit Thumb */
         #selection-toolbar input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
@@ -340,14 +389,14 @@
             cursor: pointer;
             margin-top: -5px;
         }
-        
+
         /* Firefox Track */
         #selection-toolbar input[type="range"]::-moz-range-track {
             height: 4px;
             background: #555;
             border-radius: 2px;
         }
-        
+
         /* Firefox Thumb */
         #selection-toolbar input[type="range"]::-moz-range-thumb {
             appearance: none;
@@ -358,13 +407,17 @@
             cursor: pointer;
             border: none;
         }
-        
-        #ctx-video-seek { width: 100px; cursor: pointer; }
+
+        #ctx-video-seek {
+            width: 100px;
+            cursor: pointer;
+        }
 
         .hidden-media {
             opacity: 0.3 !important;
             outline-color: #d39e00 !important;
         }
+
         .hidden-media .media-content {
             opacity: 1 !important;
         }
@@ -383,11 +436,12 @@
             transform: translate(-50%, -50%);
             transition: opacity 0.2s, visibility 0.2s;
         }
+
         #global-resize-handle.show {
             opacity: 1;
             visibility: visible;
         }
-        
+
         #global-rotate-handle {
             position: absolute;
             width: 24px;
@@ -406,15 +460,18 @@
             justify-content: center;
             font-size: 16px;
         }
+
         #global-rotate-handle::after {
             content: '↻';
             color: white;
             font-weight: bold;
         }
+
         #global-rotate-handle.show {
             opacity: 1;
             visibility: visible;
         }
+
         #global-rotate-handle:active {
             cursor: grabbing;
         }
@@ -422,48 +479,112 @@
         /* Sistema de Crop (Corte) com Alt */
         .crop-ui {
             position: absolute;
-            top: 0; right: 0; bottom: 0; left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
             pointer-events: none;
             display: none;
             border: 2px dashed #ff0055;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
             z-index: 105;
         }
+
         body.alt-pressed .draggable.selected .crop-ui {
             display: block;
         }
+
         body.alt-pressed #global-resize-handle,
         body.alt-pressed #global-rotate-handle {
             opacity: 0 !important;
             pointer-events: none;
         }
-        
+
         body.multi-select .crop-ui {
             display: none !important;
         }
+
         .crop-edge {
             position: absolute;
             pointer-events: auto;
             background: rgba(255, 0, 85, 0.5);
             transition: background 0.2s;
         }
-        .crop-edge:hover { background: rgba(255, 0, 85, 0.9); }
-        .crop-t { top: -6px; left: 10px; right: 10px; height: 12px; cursor: ns-resize; }
-        .crop-b { bottom: -6px; left: 10px; right: 10px; height: 12px; cursor: ns-resize; }
-        .crop-l { top: 10px; left: -6px; bottom: 10px; width: 12px; cursor: ew-resize; }
-        .crop-r { top: 10px; right: -6px; bottom: 10px; width: 12px; cursor: ew-resize; }
-        
-        .crop-tl { top: -6px; left: -6px; width: 12px; height: 12px; cursor: nwse-resize; }
-        .crop-tr { top: -6px; right: -6px; width: 12px; height: 12px; cursor: nesw-resize; }
-        .crop-bl { bottom: -6px; left: -6px; width: 12px; height: 12px; cursor: nesw-resize; }
-        .crop-br { bottom: -6px; right: -6px; width: 12px; height: 12px; cursor: nwse-resize; }
-        
+
+        .crop-edge:hover {
+            background: rgba(255, 0, 85, 0.9);
+        }
+
+        .crop-t {
+            top: -6px;
+            left: 10px;
+            right: 10px;
+            height: 12px;
+            cursor: ns-resize;
+        }
+
+        .crop-b {
+            bottom: -6px;
+            left: 10px;
+            right: 10px;
+            height: 12px;
+            cursor: ns-resize;
+        }
+
+        .crop-l {
+            top: 10px;
+            left: -6px;
+            bottom: 10px;
+            width: 12px;
+            cursor: ew-resize;
+        }
+
+        .crop-r {
+            top: 10px;
+            right: -6px;
+            bottom: 10px;
+            width: 12px;
+            cursor: ew-resize;
+        }
+
+        .crop-tl {
+            top: -6px;
+            left: -6px;
+            width: 12px;
+            height: 12px;
+            cursor: nwse-resize;
+        }
+
+        .crop-tr {
+            top: -6px;
+            right: -6px;
+            width: 12px;
+            height: 12px;
+            cursor: nesw-resize;
+        }
+
+        .crop-bl {
+            bottom: -6px;
+            left: -6px;
+            width: 12px;
+            height: 12px;
+            cursor: nesw-resize;
+        }
+
+        .crop-br {
+            bottom: -6px;
+            right: -6px;
+            width: 12px;
+            height: 12px;
+            cursor: nwse-resize;
+        }
+
         /* Dica de scroll */
         .tooltip {
             position: absolute;
             bottom: 20px;
             left: 20px;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0, 0, 0, 0.7);
             padding: 10px;
             border-radius: 5px;
             font-size: 14px;
@@ -484,17 +605,22 @@
             align-items: center;
             z-index: 9999;
         }
-        
+
         #zoom-controls button {
-            background: #555; border: none; color: white; padding: 5px 10px; cursor: pointer;
+            background: #555;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            cursor: pointer;
         }
-        
+
         /* Limita tamanho inicial visual na criação apenas usando estilos de base.
            Mas como escalonamos, vamos focar no width real. */
         .media-content {
             display: block !important;
             /* pointer-events: none; REMOVIDO para permitir clique e edição no texto */
-            max-width: 500px; /* Tamanho base padrão para inserção */
+            max-width: 500px;
+            /* Tamanho base padrão para inserção */
             max-height: 500px;
             /* Solução para artefatos de renderização (tearing) no Chromium */
             transform: translateZ(0);
@@ -506,12 +632,16 @@
 
         .media-crop-wrapper {
             overflow: hidden;
-            transform: translateZ(0); /* Força a camada isolada também no pai */
+            transform: translateZ(0);
+            /* Força a camada isolada também no pai */
         }
 
         #upload-overlay {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             background: rgba(0, 0, 0, 0.85);
             display: flex;
             flex-direction: column;
@@ -523,10 +653,12 @@
             visibility: hidden;
             transition: opacity 0.3s;
         }
+
         #upload-overlay.show {
             opacity: 1;
             visibility: visible;
         }
+
         .spinner {
             border: 6px solid #333;
             border-top: 6px solid #007bff;
@@ -536,11 +668,17 @@
             animation: spin 1s linear infinite;
             margin-bottom: 20px;
         }
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
-        
+
         #soundpad-sidebar {
             position: fixed;
             top: 0;
@@ -549,15 +687,17 @@
             height: 100vh;
             background: #1e1e1e;
             border-left: 1px solid #444;
-            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.5);
             z-index: 10000;
             display: flex;
             flex-direction: column;
             transition: right 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.05);
         }
+
         #soundpad-sidebar.open {
             right: 0;
         }
+
         #media-sidebar {
             position: fixed;
             top: 0;
@@ -566,15 +706,17 @@
             height: 100vh;
             background: #1e1e1e;
             border-left: 1px solid #444;
-            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.5);
             z-index: 10000;
             display: flex;
             flex-direction: column;
             transition: right 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.05);
         }
+
         #media-sidebar.open {
             right: 0;
         }
+
         #tts-sidebar {
             position: fixed;
             top: 0;
@@ -583,15 +725,17 @@
             height: 100vh;
             background: #1e1e1e;
             border-left: 1px solid #444;
-            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.5);
             z-index: 10000;
             display: flex;
             flex-direction: column;
             transition: right 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.05);
         }
+
         #tts-sidebar.open {
             right: 0;
         }
+
         .media-preview-img {
             width: 100%;
             height: 60px;
@@ -600,6 +744,7 @@
             border-radius: 4px;
             margin-bottom: 5px;
         }
+
         .soundpad-header {
             padding: 15px;
             border-bottom: 1px solid #333;
@@ -607,14 +752,24 @@
             justify-content: space-between;
             align-items: center;
         }
+
         .soundpad-header h2 {
             margin: 0;
             font-size: 18px;
         }
+
         .btn-close-soundpad {
-            background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer;
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 20px;
+            cursor: pointer;
         }
-        .btn-close-soundpad:hover { color: #fff; }
+
+        .btn-close-soundpad:hover {
+            color: #fff;
+        }
+
         .soundpad-controls {
             padding: 15px;
             display: flex;
@@ -622,10 +777,39 @@
             gap: 10px;
             border-bottom: 1px solid #333;
         }
-        .btn-stop-all { background: #dc3545; color: #fff; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .btn-stop-all:hover { background: #c82333; }
-        .btn-upload { background: #17a2b8; color: #fff; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px;}
-        .btn-upload:hover { background: #138496; }
+
+        .btn-stop-all {
+            background: #dc3545;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-stop-all:hover {
+            background: #c82333;
+        }
+
+        .btn-upload {
+            background: #17a2b8;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-upload:hover {
+            background: #138496;
+        }
+
         .soundpad-grid {
             padding: 15px;
             flex-grow: 1;
@@ -635,13 +819,16 @@
             gap: 10px;
             align-content: start;
         }
+
         .sound-btn-container {
             position: relative;
             cursor: grab;
         }
+
         .sound-btn-container.dragging {
             opacity: 0.5;
         }
+
         .sound-btn {
             background: #2c2c2c;
             border: 2px solid #444;
@@ -659,19 +846,34 @@
             font-size: 13px;
             font-weight: bold;
             word-break: break-word;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
             width: 100%;
             height: 100%;
             box-sizing: border-box;
         }
-        .sound-btn:hover { background: #3a3a3a; border-color: #007bff; transform: translateY(-2px); }
-        .sound-btn:active { transform: translateY(2px); background: #007bff; border-color: #0056b3; }
-        .sound-icon { font-size: 28px; pointer-events: none; }
+
+        .sound-btn:hover {
+            background: #3a3a3a;
+            border-color: #007bff;
+            transform: translateY(-2px);
+        }
+
+        .sound-btn:active {
+            transform: translateY(2px);
+            background: #007bff;
+            border-color: #0056b3;
+        }
+
+        .sound-icon {
+            font-size: 28px;
+            pointer-events: none;
+        }
+
         .btn-edit-audio {
             position: absolute;
             top: 5px;
             right: 5px;
-            background: rgba(0,0,0,0.6);
+            background: rgba(0, 0, 0, 0.6);
             border: none;
             color: white;
             border-radius: 4px;
@@ -681,10 +883,15 @@
             opacity: 0;
             transition: opacity 0.2s;
         }
+
         .sound-btn-container:hover .btn-edit-audio {
             opacity: 1;
         }
-        .btn-edit-audio:hover { background: #007bff; }
+
+        .btn-edit-audio:hover {
+            background: #007bff;
+        }
+
         .sound-btn-pin {
             position: absolute;
             top: 5px;
@@ -692,13 +899,86 @@
             font-size: 14px;
             pointer-events: none;
         }
+
+        #tts-admin-preview {
+            position: absolute;
+            z-index: 99999;
+            pointer-events: none;
+            opacity: 0;
+            top: var(--tts-hidden-top, auto);
+            bottom: var(--tts-hidden-bottom, -400px);
+            left: var(--tts-hidden-left, auto);
+            right: var(--tts-hidden-right, 20px);
+            transform: var(--tts-hidden-transform, none);
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #tts-admin-preview.show {
+            top: var(--tts-show-top, auto);
+            bottom: var(--tts-show-bottom, 20px);
+            left: var(--tts-show-left, auto);
+            right: var(--tts-show-right, 20px);
+            transform: var(--tts-show-transform, none);
+            opacity: 1;
+        }
+
+        #tts-admin-preview img {
+            max-height: 300px;
+            max-width: 300px;
+            object-fit: contain;
+            filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.5));
+        }
+
+        #tts-admin-subtitle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 150%;
+            text-align: center;
+            font-size: 28px;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0px 4px 6px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+            font-family: 'Arial', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            z-index: 100000;
+        }
+
+        #tts-admin-subtitle span {
+            display: inline-block;
+            transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.15s ease-out, color 0.15s ease-out;
+            margin-right: 8px;
+        }
+
+        .tts-word-hidden {
+            opacity: 0;
+            transform: translateY(20px);
+            color: #fff;
+        }
+
+        .tts-word-visible {
+            opacity: 1;
+            transform: translateY(0);
+            color: #fff;
+        }
+
+        .tts-word-active {
+            opacity: 1;
+            transform: translateY(0);
+            color: var(--tts-active-color, #ffd700);
+        }
     </style>
 </head>
+
 <body>
 
     <div id="floating-toolbar">
         <div class="tool-container">
-            <button class="tool-btn" id="btn-webrtc" title="Conectar Retorno de Vídeo" style="background-color: #28a745; border-color: #218838;">📡</button>
+            <button class="tool-btn" id="btn-webrtc" title="Conectar Retorno de Vídeo"
+                style="background-color: #28a745; border-color: #218838;">📡</button>
         </div>
 
         <div class="tool-container">
@@ -707,7 +987,8 @@
                 <h3>⚙️ Preferências</h3>
                 <div class="input-group">
                     <label>Modo de Navegação</label>
-                    <select id="nav-mode" style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; cursor: pointer;">
+                    <select id="nav-mode"
+                        style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; cursor: pointer;">
                         <option value="mouse">Mouse (Scroll = Zoom)</option>
                         <option value="trackpad">Trackpad (Scroll = Mover)</option>
                     </select>
@@ -722,9 +1003,10 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="tool-container">
-            <button class="tool-btn" title="Adicionar Imagem/Vídeo (URL)" onclick="toggleToolPanel('panel-media', this)">🖼️</button>
+            <button class="tool-btn" title="Adicionar Imagem/Vídeo (URL)"
+                onclick="toggleToolPanel('panel-media', this)">🖼️</button>
             <div id="panel-media" class="tool-panel">
                 <h3>🖼️ Adicionar Mídia</h3>
                 <div class="input-group">
@@ -770,7 +1052,8 @@
             <div id="panel-help" class="tool-panel">
                 <h3>❓ Atalhos e Ajuda</h3>
                 <div style="font-size: 13px; color: #ccc; line-height: 1.8;">
-                    <span id="help-scroll-text">🖱️ <b>Scroll:</b> Zoom<br>🖱️ <b>Espaço + Arrastar:</b> Mover Tela</span><br>
+                    <span id="help-scroll-text">🖱️ <b>Scroll:</b> Zoom<br>🖱️ <b>Espaço + Arrastar:</b> Mover
+                        Tela</span><br>
                     ⌨️ <b>Shift + Scroll:</b> Esticar na Horizontal<br>
                     ⌨️ <b>Alt + Scroll:</b> Esticar na Vertical<br>
                     ⌨️ <b>Delete:</b> Apagar Selecionada<br>
@@ -787,11 +1070,17 @@
             <div id="virtual-canvas">
                 <div id="obs-bounds">
                     <video id="remoteVideo" autoplay playsinline></video>
+                    <div id="tts-admin-preview">
+                        <img id="tts-admin-img" src="" alt="Character">
+                        <div id="tts-admin-subtitle"></div>
+                    </div>
                 </div>
-                <div id="marquee-box" style="position: absolute; border: 1px solid rgba(0, 123, 255, 0.8); background: rgba(0, 123, 255, 0.2); display: none; pointer-events: none; z-index: 99999;"></div>
+                <div id="marquee-box"
+                    style="position: absolute; border: 1px solid rgba(0, 123, 255, 0.8); background: rgba(0, 123, 255, 0.2); display: none; pointer-events: none; z-index: 99999;">
+                </div>
                 <!-- Elementos inseridos aparecerão aqui -->
             </div>
-        
+
             <!-- UI Global de Seleção (Fora do scale da imagem, mas movida para dentro do wrapper para acompanhar o alinhamento das margens) -->
             <div id="selection-toolbar">
                 <!-- Group: Layer -->
@@ -799,7 +1088,7 @@
                     <button id="btn-ctx-layer-up" title="Trazer para Frente">⏫</button>
                     <button id="btn-ctx-layer-down" title="Enviar para Trás">⏬</button>
                 </div>
-                
+
                 <div class="toolbar-divider"></div>
 
                 <!-- Group: Visibility -->
@@ -827,8 +1116,10 @@
                 <!-- Group: Video (Only shows for video) -->
                 <div class="toolbar-divider video-only"></div>
                 <div class="toolbar-control-group video-only" style="padding-left: 4px;">
-                    <button id="btn-ctx-mute" title="Mudo/Áudio" style="background:transparent; border:none; padding:2px 4px; margin:0; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; box-shadow:none;">🔊</button>
-                    <input type="range" id="ctx-video-volume" min="0" max="1" step="0.01" value="1" title="Volume do Vídeo" style="width: 60px;">
+                    <button id="btn-ctx-mute" title="Mudo/Áudio"
+                        style="background:transparent; border:none; padding:2px 4px; margin:0; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; box-shadow:none;">🔊</button>
+                    <input type="range" id="ctx-video-volume" min="0" max="1" step="0.01" value="1"
+                        title="Volume do Vídeo" style="width: 60px;">
                 </div>
                 <div class="toolbar-control-group video-only" title="Tempo do Vídeo">
                     <span>⏱️</span>
@@ -844,31 +1135,42 @@
             <div id="global-rotate-handle"></div>
         </div>
     </div>
-    
-    <div id="audio-edit-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100000; align-items: center; justify-content: center;">
-        <div style="background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #444; width: 300px; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);">
-            <h3 style="margin: 0; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; display: flex; align-items: center; gap: 8px;">✏️ Editar Áudio</h3>
+
+    <div id="audio-edit-modal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100000; align-items: center; justify-content: center;">
+        <div
+            style="background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #444; width: 300px; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);">
+            <h3
+                style="margin: 0; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                ✏️ Editar Áudio</h3>
             <div class="input-group">
                 <label>Ícone (Emoji)</label>
-                <input type="text" id="edit-audio-icon" style="padding: 10px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 16px;" maxlength="5">
+                <input type="text" id="edit-audio-icon"
+                    style="padding: 10px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 16px;"
+                    maxlength="5">
             </div>
             <div class="input-group">
                 <label>Nome do Áudio</label>
-                <input type="text" id="edit-audio-name" style="padding: 10px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 14px;">
+                <input type="text" id="edit-audio-name"
+                    style="padding: 10px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 14px;">
             </div>
             <div style="display: flex; gap: 10px;">
                 <div class="input-group" style="flex: 1;">
                     <label>Início (seg)</label>
-                    <input type="number" id="edit-audio-trim-start" step="0.1" min="0" placeholder="0" style="padding: 10px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 14px; width: 100%; box-sizing: border-box;">
+                    <input type="number" id="edit-audio-trim-start" step="0.1" min="0" placeholder="0"
+                        style="padding: 10px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 14px; width: 100%; box-sizing: border-box;">
                 </div>
                 <div class="input-group" style="flex: 1;">
                     <label>Fim (seg)</label>
-                    <input type="number" id="edit-audio-trim-end" step="0.1" min="0" placeholder="Fim" style="padding: 10px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 14px; width: 100%; box-sizing: border-box;">
+                    <input type="number" id="edit-audio-trim-end" step="0.1" min="0" placeholder="Fim"
+                        style="padding: 10px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 14px; width: 100%; box-sizing: border-box;">
                 </div>
             </div>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
-                <button id="btn-save-audio" style="flex: 1; padding: 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Salvar</button>
-                <button id="btn-cancel-audio" style="flex: 1; padding: 10px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Cancelar</button>
+                <button id="btn-save-audio"
+                    style="flex: 1; padding: 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Salvar</button>
+                <button id="btn-cancel-audio"
+                    style="flex: 1; padding: 10px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Cancelar</button>
             </div>
         </div>
     </div>
@@ -893,17 +1195,23 @@
         <div class="soundpad-controls">
             <div class="input-group">
                 <label>Volume Global (<span id="audio-vol-label">50%</span>)</label>
-                <input type="range" id="audio-volume" min="0" max="1" step="0.05" value="0.5" style="width: 100%; cursor: pointer;">
+                <input type="range" id="audio-volume" min="0" max="1" step="0.05" value="0.5"
+                    style="width: 100%; cursor: pointer;">
             </div>
-            
-            <div id="audio-player-controls" style="background: #222; border-radius: 8px; padding: 10px; margin-top: 5px; border: 1px solid #444;">
-                <div style="font-size: 13px; color: #fff; margin-bottom: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold;" id="current-audio-name">Nenhum áudio tocando</div>
-                
+
+            <div id="audio-player-controls"
+                style="background: #222; border-radius: 8px; padding: 10px; margin-top: 5px; border: 1px solid #444;">
+                <div style="font-size: 13px; color: #fff; margin-bottom: 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold;"
+                    id="current-audio-name">Nenhum áudio tocando</div>
+
                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                    <button id="btn-player-playpause" style="background: #007bff; border: none; border-radius: 50%; width: 40px; height: 40px; color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">▶️</button>
-                    <button id="btn-audio-stop" class="btn-stop-all" style="flex: 1; padding: 8px; margin: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">⏹️ Parar</button>
+                    <button id="btn-player-playpause"
+                        style="background: #007bff; border: none; border-radius: 50%; width: 40px; height: 40px; color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">▶️</button>
+                    <button id="btn-audio-stop" class="btn-stop-all"
+                        style="flex: 1; padding: 8px; margin: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">⏹️
+                        Parar</button>
                 </div>
-                
+
                 <div style="display: flex; align-items: center; gap: 8px; font-size: 11px;">
                     <span id="player-time-current" style="width: 30px; text-align: right;">0:00</span>
                     <input type="range" id="player-seek" min="0" max="100" value="0" style="flex: 1; cursor: pointer;">
@@ -919,7 +1227,7 @@
         </div>
     </div>
 
-        <div id="media-sidebar">
+    <div id="media-sidebar">
         <div class="soundpad-header">
             <h2>📁 Biblioteca de Mídia</h2>
             <button class="btn-close-soundpad" onclick="toggleMediaSidebar()">✖</button>
@@ -941,7 +1249,8 @@
         <div class="soundpad-controls">
             <div class="input-group">
                 <label>Imagem do Personagem (PNG)</label>
-                <input type="file" id="tts-image-file" accept="image/png,image/gif,image/webp,image/jpeg" style="margin-bottom: 5px;">
+                <input type="file" id="tts-image-file" accept="image/png,image/gif,image/webp,image/jpeg"
+                    style="margin-bottom: 5px;">
                 <input type="text" id="tts-image-url" placeholder="Ou cole a URL da imagem aqui...">
             </div>
             <div class="input-group">
@@ -949,20 +1258,28 @@
                     Posição na Tela
                     <div style="display: flex; align-items: center; gap: 5px;">
                         <span style="font-size: 12px;">Cor Legenda:</span>
-                        <input type="color" id="tts-subtitle-color" value="#ffd700" style="padding: 0; border: none; width: 24px; height: 24px; cursor: pointer; background: none;">
+                        <input type="color" id="tts-subtitle-color" value="#ffd700"
+                            style="padding: 0; border: none; width: 24px; height: 24px; cursor: pointer; background: none;">
                     </div>
                 </label>
-                <select id="tts-position" style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; cursor: pointer; width: 100%;">
+                <select id="tts-position"
+                    style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; cursor: pointer; width: 100%;">
                     <option value="right">Canto Inferior Direito</option>
                     <option value="left">Canto Inferior Esquerdo</option>
                     <option value="custom">Personalizado (Arrastar)</option>
                 </select>
-                <div id="tts-custom-position-container" style="display: none; flex-direction: column; gap: 5px; margin-top: 5px;">
-                    <span style="font-size: 12px; color: #aaa; text-align: center;">Pré-visualização (Isto não está aparecendo na live ainda)</span>
-                    <div id="tts-canvas" style="position: relative; width: 100%; aspect-ratio: 16 / 9; background: #222; border: 1px dashed #555; border-radius: 4px; overflow: hidden; cursor: crosshair;">
-                        <div id="tts-canvas-char" style="position: absolute; left: 80%; top: 80%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: rgba(0, 150, 255, 0.5); border: 2px solid #0096ff; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: grab; user-select: none;">🤖</div>
+                <div id="tts-custom-position-container"
+                    style="display: none; flex-direction: column; gap: 5px; margin-top: 5px;">
+                    <span style="font-size: 12px; color: #aaa; text-align: center;">Pré-visualização (Isto não está
+                        aparecendo na live ainda)</span>
+                    <div id="tts-canvas"
+                        style="position: relative; width: 100%; aspect-ratio: 16 / 9; background: #222; border: 1px dashed #555; border-radius: 4px; overflow: hidden; cursor: crosshair;">
+                        <div id="tts-canvas-char"
+                            style="position: absolute; left: 80%; top: 80%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: rgba(0, 150, 255, 0.5); border: 2px solid #0096ff; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: grab; user-select: none;">
+                            🤖</div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #aaa; margin-top: 5px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #aaa; margin-top: 5px;">
                         <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; margin: 0;">
                             <input type="checkbox" id="tts-custom-flip" style="margin: 0;"> Virar Personagem
                         </label>
@@ -973,14 +1290,16 @@
             <div class="input-group">
                 <label style="display: flex; justify-content: space-between;">
                     Áudio Customizado (Opcional)
-                    <button id="btn-tts-clear-audio" style="background: none; border: none; color: #dc3545; cursor: pointer; text-decoration: underline; font-size: 12px; padding: 0;">Limpar</button>
+                    <button id="btn-tts-clear-audio"
+                        style="background: none; border: none; color: #dc3545; cursor: pointer; text-decoration: underline; font-size: 12px; padding: 0;">Limpar</button>
                 </label>
                 <input type="file" id="tts-audio-file" accept="audio/*" style="margin-bottom: 5px;">
                 <input type="text" id="tts-audio-url" placeholder="Ou cole a URL do áudio aqui...">
             </div>
             <div class="input-group">
                 <label>Ordem de Reprodução</label>
-                <select id="tts-audio-behavior" style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; cursor: pointer;">
+                <select id="tts-audio-behavior"
+                    style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; cursor: pointer;">
                     <option value="simultaneous">Simultâneo (Padrão)</option>
                     <option value="audio_only">Apenas Áudio</option>
                     <option value="audio_before">Áudio antes do Texto</option>
@@ -989,11 +1308,15 @@
             </div>
             <div class="input-group">
                 <label>Texto para Falar</label>
-                <textarea id="tts-text" rows="3" placeholder="Digite o que o personagem vai falar..." style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; width: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+                <textarea id="tts-text" rows="3" placeholder="Digite o que o personagem vai falar..."
+                    style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; width: 100%; box-sizing: border-box; resize: vertical;"></textarea>
             </div>
             <div style="display: flex; gap: 10px; margin-top: 5px;">
-                <button id="btn-tts-speak" class="btn-success" style="flex: 2; padding: 10px; font-weight: bold;">Falar 🔊</button>
-                <button id="btn-tts-stop" style="flex: 1; padding: 10px; font-weight: bold; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Parar ⏹️</button>
+                <button id="btn-tts-speak" class="btn-success" style="flex: 2; padding: 10px; font-weight: bold;">Falar
+                    🔊</button>
+                <button id="btn-tts-stop"
+                    style="flex: 1; padding: 10px; font-weight: bold; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Parar
+                    ⏹️</button>
             </div>
         </div>
     </div>
@@ -1001,7 +1324,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        
+
         // Elementos DOM
         const urlInput = document.getElementById('media-url');
         const btnAdd = document.getElementById('btn-add');
@@ -1015,7 +1338,7 @@
         const adminNameInput = document.getElementById('admin-name');
         const adminColorInput = document.getElementById('admin-color');
         const navModeSelect = document.getElementById('nav-mode');
-        
+
         // Elementos do Audio Player
         const btnAudioStop = document.getElementById('btn-audio-stop');
         const audioVolume = document.getElementById('audio-volume');
@@ -1025,7 +1348,7 @@
         const playerTimeCurrent = document.getElementById('player-time-current');
         const playerTimeTotal = document.getElementById('player-time-total');
         const currentAudioName = document.getElementById('current-audio-name');
-        
+
         let globalAudio = new Audio();
 
         // Elementos do Context Toolbar
@@ -1040,7 +1363,7 @@
         const ctxVideoSeek = document.getElementById('ctx-video-seek');
         const ctxVideoVolume = document.getElementById('ctx-video-volume');
         const ctxOpacity = document.getElementById('ctx-opacity');
-        
+
         const btnCtxFlipH = document.getElementById('btn-ctx-flip-h');
         const btnCtxFlipV = document.getElementById('btn-ctx-flip-v');
         const btnCtxDuplicate = document.getElementById('btn-ctx-duplicate');
@@ -1055,7 +1378,7 @@
         if (localStorage.getItem('navMode')) {
             navModeSelect.value = localStorage.getItem('navMode');
         }
-        
+
         // Salva as preferências automaticamente ao digitar/alterar
         adminNameInput.addEventListener('input', () => localStorage.setItem('adminName', adminNameInput.value));
         adminColorInput.addEventListener('input', () => localStorage.setItem('adminColor', adminColorInput.value));
@@ -1074,27 +1397,27 @@
             }
         }
         updateHelpText();
-        
+
         let lastToolbarLeft, lastToolbarTop, lastHandleLeft, lastHandleTop, lastRotateHandleLeft, lastRotateHandleTop, lastVideoSeek;
-        
+
         function applyTransform(id) {
             const media = mediaState[id];
             const container = document.getElementById(`admin-${id}`);
             if (!container) return;
-            
+
             const sx = media.scaleX !== undefined ? media.scaleX : (media.scale || 1);
             const sy = media.scaleY !== undefined ? media.scaleY : (media.scale || 1);
             const rot = media.rotation || 0;
-            
+
             container.style.transform = `translateZ(0) rotate(${rot}deg) scale(${sx}, ${sy})`;
-            
+
             const wrapperEl = container.querySelector('.media-crop-wrapper');
             const contentEl = container.querySelector('.media-content');
             if (wrapperEl && contentEl) {
                 const flipX = media.flipX ? -1 : 1;
                 const flipY = media.flipY ? -1 : 1;
                 wrapperEl.style.transform = `scale(${flipX}, ${flipY})`;
-                
+
                 if (media.type === 'text') {
                     contentEl.style.width = 'max-content';
                     contentEl.style.height = 'max-content';
@@ -1137,7 +1460,7 @@
                     contentEl.style.marginTop = `-${cT}px`;
                 }
             }
-            
+
             const cropUI = container.querySelector('.crop-ui');
             if (cropUI) {
                 cropUI.style.top = '0px';
@@ -1163,14 +1486,14 @@
                 document.body.classList.add('multi-select');
                 globalResizeHandle.classList.remove('show');
                 globalRotateHandle.classList.remove('show');
-                
+
                 let minX = Infinity, minY = Infinity;
-                
+
                 selectedElements.forEach(id => {
                     const media = mediaState[id];
                     const el = document.getElementById(`admin-${id}`);
                     if (!media || !el) return;
-                    
+
                     const sx = media.scaleX !== undefined ? media.scaleX : (media.scale || 1);
                     const sy = media.scaleY !== undefined ? media.scaleY : (media.scale || 1);
                     const rot = media.rotation || 0;
@@ -1178,7 +1501,7 @@
 
                     const contentEl = el.querySelector('.media-content');
                     if (!contentEl) return;
-                    
+
                     const baseWidth = contentEl.offsetWidth || 1;
                     const baseHeight = contentEl.offsetHeight || 1;
 
@@ -1194,10 +1517,10 @@
                     const topPos = (media.y + canvasPadding) * currentScale;
 
                     const corners = [
-                        {x: 0, y: 0},
-                        {x: visibleWidth, y: 0},
-                        {x: visibleWidth, y: visibleHeight},
-                        {x: 0, y: visibleHeight}
+                        { x: 0, y: 0 },
+                        { x: visibleWidth, y: 0 },
+                        { x: visibleWidth, y: visibleHeight },
+                        { x: 0, y: visibleHeight }
                     ];
 
                     corners.forEach(c => {
@@ -1240,7 +1563,7 @@
 
             const contentEl = el.querySelector('.media-content');
             if (!contentEl) return;
-            
+
             const baseWidth = contentEl.offsetWidth || 1;
             const baseHeight = contentEl.offsetHeight || 1;
 
@@ -1256,12 +1579,12 @@
             const topPos = (media.y + canvasPadding) * currentScale;
 
             const corners = [
-                {x: 0, y: 0},
-                {x: visibleWidth, y: 0},
-                {x: visibleWidth, y: visibleHeight},
-                {x: 0, y: visibleHeight}
+                { x: 0, y: 0 },
+                { x: visibleWidth, y: 0 },
+                { x: visibleWidth, y: visibleHeight },
+                { x: 0, y: visibleHeight }
             ];
-            
+
             let minX = Infinity, minY = Infinity;
             corners.forEach(c => {
                 const sx_c = c.x * sx;
@@ -1305,7 +1628,7 @@
             const unscaledTopRightY = 0;
             const scaledTopRightX = unscaledTopRightX * sx;
             const scaledTopRightY = unscaledTopRightY * sy;
-            
+
             const trhrx = scaledTopRightX * Math.cos(rad) - scaledTopRightY * Math.sin(rad);
             const trhry = scaledTopRightX * Math.sin(rad) + scaledTopRightY * Math.cos(rad);
 
@@ -1337,16 +1660,16 @@
         function setRotationAroundCenter(id, newRotation, startX = null, startY = null, startRot = null) {
             const media = mediaState[id];
             if (!media) return;
-            
+
             const oldRot = startRot !== null ? startRot : (media.rotation || 0);
             const oldRad = oldRot * Math.PI / 180;
             const newRad = newRotation * Math.PI / 180;
-            
+
             const container = document.getElementById(`admin-${id}`);
             const contentEl = container ? container.querySelector('.media-content') : null;
             const baseWidth = contentEl ? (contentEl.offsetWidth || 1) : 100;
             const baseHeight = contentEl ? (contentEl.offsetHeight || 1) : 100;
-            
+
             const crop = media.crop || { t: 0, r: 0, b: 0, l: 0 };
             let uiT = Math.round(crop.t), uiR = Math.round(crop.r), uiB = Math.round(crop.b), uiL = Math.round(crop.l);
             if (media.flipX) { uiL = Math.round(crop.r); uiR = Math.round(crop.l); }
@@ -1354,22 +1677,22 @@
 
             const visibleWidth = Math.max(1, Math.round(baseWidth) - uiL - uiR);
             const visibleHeight = Math.max(1, Math.round(baseHeight) - uiT - uiB);
-            
+
             const cx = visibleWidth / 2;
             const cy = visibleHeight / 2;
-            
+
             const sx = media.scaleX !== undefined ? media.scaleX : (media.scale || 1);
             const sy = media.scaleY !== undefined ? media.scaleY : (media.scale || 1);
-            
+
             const scaledCx = cx * sx;
             const scaledCy = cy * sy;
-            
+
             const oldRx = scaledCx * Math.cos(oldRad) - scaledCy * Math.sin(oldRad);
             const oldRy = scaledCx * Math.sin(oldRad) + scaledCy * Math.cos(oldRad);
-            
+
             const newRx = scaledCx * Math.cos(newRad) - scaledCy * Math.sin(newRad);
             const newRy = scaledCx * Math.sin(newRad) + scaledCy * Math.cos(newRad);
-            
+
             const baseX = startX !== null ? startX : media.x;
             const baseY = startY !== null ? startY : media.y;
 
@@ -1377,19 +1700,19 @@
             media.y = Math.round(baseY + oldRy - newRy);
             media.rotation = newRotation;
         }
-        
+
         // ============================================
         // EMISSÃO OTIMIZADA VIA REQUEST ANIMATION FRAME
         // ============================================
         let pendingAdminMouseMove = false;
         let adminMouseMoveData = {};
-        
+
         let pendingDragSync = false;
         let dragSyncDataMap = {};
-        
+
         let pendingScaleSync = false;
         let scaleSyncData = {};
-        
+
         let pendingTransformSync = false;
         let transformSyncData = {};
 
@@ -1398,7 +1721,7 @@
 
         function renderLoop() {
             updateSelectionUI();
-            
+
             // Dispara as emissões pendentes sincronizadas com a taxa de quadros do monitor
             if (pendingScaleSync) {
                 socket.emit('media:scale_sync', scaleSyncData);
@@ -1422,7 +1745,7 @@
             requestAnimationFrame(renderLoop);
         }
         requestAnimationFrame(renderLoop);
-        
+
         function closeAllSidebars() {
             ['soundpad-sidebar', 'media-sidebar', 'tts-sidebar'].forEach(id => {
                 const sidebar = document.getElementById(id);
@@ -1433,13 +1756,13 @@
         function toggleSidebar(sidebarId) {
             const el = document.getElementById(sidebarId);
             const wasOpen = el.classList.contains('open');
-            
+
             closeAllSidebars();
-            
+
             if (!wasOpen) {
                 el.classList.add('open');
             }
-            
+
             document.querySelectorAll('.tool-panel').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
         }
@@ -1454,20 +1777,20 @@
             const media = currentMediaList.find(m => m.id === id);
             if (!media) return;
             const newPinned = !media.pinned;
-            
+
             fetch('/api/media-update/' + id, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ pinned: newPinned })
             })
-            .then(res => res.json())
-            .then(data => {
-                if(data.success) {
-                    media.pinned = newPinned;
-                    loadMediaUploads(); 
-                }
-            })
-            .catch(e => console.error(e));
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        media.pinned = newPinned;
+                        loadMediaUploads();
+                    }
+                })
+                .catch(e => console.error(e));
         }
 
         function createMediaLibButton(mediaObj) {
@@ -1481,13 +1804,13 @@
             if (mediaObj.pinned) btn.style.borderColor = 'gold';
 
             let isVideo = mediaObj.url.match(/\.(mp4|webm|ogg)$/i);
-            
+
             if (isVideo) {
                 btn.innerHTML = `<video src="${mediaObj.url}" class="media-preview-img" muted></video><span>${mediaObj.name}</span>`;
             } else {
                 btn.innerHTML = `<img src="${mediaObj.url}" class="media-preview-img" /><span>${mediaObj.name}</span>`;
             }
-            
+
             // Drag and drop into canvas
             btn.onclick = () => {
                 const rect = virtualCanvas.getBoundingClientRect();
@@ -1515,16 +1838,16 @@
                 e.stopPropagation();
                 if (confirm('Tem certeza que deseja excluir a mídia "' + mediaObj.name + '"?')) {
                     fetch('/api/media-delete/' + mediaObj.id, { method: 'POST' })
-                    .then(res => res.json())
-                    .then(data => { if (data.success) loadMediaUploads(); })
-                    .catch(e => console.error(e));
+                        .then(res => res.json())
+                        .then(data => { if (data.success) loadMediaUploads(); })
+                        .catch(e => console.error(e));
                 }
             };
 
             container.appendChild(btn);
             container.appendChild(pinBtn);
             container.appendChild(delBtn);
-            
+
             // Drag to reorder inside sidebar
             container.addEventListener('dragstart', handleMediaDragStart);
             container.addEventListener('dragenter', handleDragEnter);
@@ -1535,19 +1858,19 @@
 
             return container;
         }
-        
+
         let dragMediaSrcEl = null;
 
         function handleMediaDragStart(e) {
             this.style.opacity = '0.4';
             dragMediaSrcEl = this;
             e.dataTransfer.effectAllowed = 'move';
-            
+
             // Allow dropping to canvas! We pass the URL
             const mediaObj = currentMediaList.find(m => m.id === this.dataset.id);
             if (mediaObj) {
-                 e.dataTransfer.setData('URL', mediaObj.url);
-                 e.dataTransfer.setData('text/plain', mediaObj.url);
+                e.dataTransfer.setData('URL', mediaObj.url);
+                e.dataTransfer.setData('text/plain', mediaObj.url);
             }
             e.dataTransfer.setData('text/html', this.innerHTML);
             this.classList.add('dragging');
@@ -1590,15 +1913,15 @@
                 grid.appendChild(createMediaLibButton(media));
             });
         }
-        
+
         function loadMediaUploads() {
             fetch('/api/media-list')
-            .then(res => res.json())
-            .then(medias => {
-                currentMediaList = medias;
-                renderMediaGrid();
-            })
-            .catch(e => console.error("Erro ao carregar mídias:", e));
+                .then(res => res.json())
+                .then(medias => {
+                    currentMediaList = medias;
+                    renderMediaGrid();
+                })
+                .catch(e => console.error("Erro ao carregar mídias:", e));
         }
 
         window.addEventListener('load', loadMediaUploads);
@@ -1612,24 +1935,24 @@
                 const file = e.target.files[0];
                 const formData = new FormData();
                 formData.append('file', file);
-                
+
                 const overlay = document.getElementById('upload-overlay');
                 document.getElementById('upload-text').innerText = "Enviando mídia...";
                 overlay.classList.add('show');
 
                 fetch('/upload', { method: 'POST', body: formData })
-                .then(res => res.json())
-                .then(data => {
-                    overlay.classList.remove('show');
-                    if (data.url) {
-                        loadMediaUploads();
-                    }
-                })
-                .catch(err => {
-                    overlay.classList.remove('show');
-                    alert('Erro no upload de mídia.');
-                });
-                
+                    .then(res => res.json())
+                    .then(data => {
+                        overlay.classList.remove('show');
+                        if (data.url) {
+                            loadMediaUploads();
+                        }
+                    })
+                    .catch(err => {
+                        overlay.classList.remove('show');
+                        alert('Erro no upload de mídia.');
+                    });
+
                 e.target.value = '';
             }
         });
@@ -1680,7 +2003,7 @@
                 currentAudioList.splice(targetIndex, 0, draggedItem);
 
                 const newOrderIds = currentAudioList.map(a => a.id);
-                
+
                 // Re-render
                 renderAudioGrid();
 
@@ -1723,52 +2046,52 @@
             const newName = document.getElementById('edit-audio-name').value;
             const newTrimStart = document.getElementById('edit-audio-trim-start').value;
             const newTrimEnd = document.getElementById('edit-audio-trim-end').value;
-            
+
             fetch(`/api/audio-update/${currentEditAudioId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    name: newName, 
+                body: JSON.stringify({
+                    name: newName,
                     icon: newIcon,
                     trimStart: newTrimStart === '' ? null : Number(newTrimStart),
                     trimEnd: newTrimEnd === '' ? null : Number(newTrimEnd)
                 })
             })
-            .then(res => res.json())
-            .then(data => {
-                if(data.success) {
-                    const audio = currentAudioList.find(a => a.id === currentEditAudioId);
-                    if (audio) {
-                        audio.name = newName;
-                        audio.icon = newIcon;
-                        audio.trimStart = newTrimStart === '' ? null : Number(newTrimStart);
-                        audio.trimEnd = newTrimEnd === '' ? null : Number(newTrimEnd);
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const audio = currentAudioList.find(a => a.id === currentEditAudioId);
+                        if (audio) {
+                            audio.name = newName;
+                            audio.icon = newIcon;
+                            audio.trimStart = newTrimStart === '' ? null : Number(newTrimStart);
+                            audio.trimEnd = newTrimEnd === '' ? null : Number(newTrimEnd);
+                        }
+                        renderAudioGrid();
                     }
-                    renderAudioGrid();
-                }
-                document.getElementById('audio-edit-modal').style.display = 'none';
-            })
-            .catch(e => console.error(e));
+                    document.getElementById('audio-edit-modal').style.display = 'none';
+                })
+                .catch(e => console.error(e));
         });
 
         function togglePinAudio(id) {
             const audio = currentAudioList.find(a => a.id === id);
             if (!audio) return;
             const newPinned = !audio.pinned;
-            
+
             fetch(`/api/audio-update/${id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ pinned: newPinned })
             })
-            .then(res => res.json())
-            .then(data => {
-                if(data.success) {
-                    audio.pinned = newPinned;
-                    loadAudioUploads(); // Reload list to re-sort
-                }
-            })
-            .catch(e => console.error(e));
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        audio.pinned = newPinned;
+                        loadAudioUploads(); // Reload list to re-sort
+                    }
+                })
+                .catch(e => console.error(e));
         }
 
         let previewAudioInstance = null;
@@ -1784,8 +2107,8 @@
 
             btn.innerHTML = `<span class="sound-icon">${audio.icon || '🎵'}</span><span>${audio.name}</span>`;
             btn.onclick = () => {
-                socket.emit('audio:play', { 
-                    url: audio.url, 
+                socket.emit('audio:play', {
+                    url: audio.url,
                     currentTime: audio.trimStart || 0,
                     trimEnd: audio.trimEnd || null
                 });
@@ -1818,7 +2141,7 @@
             previewBtn.style.left = '5px';
             previewBtn.onclick = (e) => {
                 e.stopPropagation();
-                
+
                 if (previewAudioInstance && previewBtn.innerHTML === '⏹️') {
                     previewAudioInstance.pause();
                     previewBtn.innerHTML = '🎧';
@@ -1833,13 +2156,13 @@
                         btn.title = 'Preview (Ouvir localmente)';
                     });
                 }
-                
+
                 previewBtn.innerHTML = '⏹️';
                 previewBtn.title = 'Parar Preview';
 
                 previewAudioInstance = new Audio(audio.url);
                 previewAudioInstance.volume = parseFloat(document.getElementById('audio-volume').value) || 0.5;
-                
+
                 previewAudioInstance.onended = () => {
                     previewBtn.innerHTML = '🎧';
                     previewBtn.title = 'Preview (Ouvir localmente)';
@@ -1859,9 +2182,9 @@
                 e.stopPropagation();
                 if (confirm(`Tem certeza que deseja excluir o áudio "${audio.name}"?`)) {
                     fetch(`/api/audio-delete/${audio.id}`, { method: 'POST' })
-                    .then(res => res.json())
-                    .then(data => { if (data.success) loadAudioUploads(); })
-                    .catch(e => console.error(e));
+                        .then(res => res.json())
+                        .then(data => { if (data.success) loadAudioUploads(); })
+                        .catch(e => console.error(e));
                 }
             };
 
@@ -1888,15 +2211,15 @@
                 grid.appendChild(createSoundButton(audio));
             });
         }
-        
+
         function loadAudioUploads() {
             fetch('/api/audio-list')
-            .then(res => res.json())
-            .then(audios => {
-                currentAudioList = audios;
-                renderAudioGrid();
-            })
-            .catch(e => console.error("Erro ao carregar áudios:", e));
+                .then(res => res.json())
+                .then(audios => {
+                    currentAudioList = audios;
+                    renderAudioGrid();
+                })
+                .catch(e => console.error("Erro ao carregar áudios:", e));
         }
 
         window.addEventListener('load', loadAudioUploads);
@@ -1911,24 +2234,24 @@
                 const file = e.target.files[0];
                 const formData = new FormData();
                 formData.append('file', file);
-                
+
                 const overlay = document.getElementById('upload-overlay');
                 document.getElementById('upload-text').innerText = "Enviando áudio...";
                 overlay.classList.add('show');
 
                 fetch('/upload-audio', { method: 'POST', body: formData })
-                .then(res => res.json())
-                .then(data => {
-                    overlay.classList.remove('show');
-                    if (data.url) {
-                        loadAudioUploads();
-                    }
-                })
-                .catch(err => {
-                    overlay.classList.remove('show');
-                    alert('Erro no upload de áudio.');
-                });
-                
+                    .then(res => res.json())
+                    .then(data => {
+                        overlay.classList.remove('show');
+                        if (data.url) {
+                            loadAudioUploads();
+                        }
+                    })
+                    .catch(err => {
+                        overlay.classList.remove('show');
+                        alert('Erro no upload de áudio.');
+                    });
+
                 // Reseta o input para permitir enviar o mesmo arquivo novamente
                 e.target.value = '';
             }
@@ -2007,8 +2330,8 @@
         btnPlayerPlayPause.addEventListener('click', () => {
             if (!globalAudio.src || globalAudio.src === window.location.href) return;
             if (globalAudio.paused) {
-                socket.emit('audio:play', { 
-                    url: globalAudio.src, 
+                socket.emit('audio:play', {
+                    url: globalAudio.src,
                     currentTime: globalAudio.currentTime,
                     trimEnd: globalAudio.dataset.trimEnd ? parseFloat(globalAudio.dataset.trimEnd) : null
                 });
@@ -2044,14 +2367,14 @@
             }
 
             const playNow = () => {
-                try { 
+                try {
                     if (Math.abs(globalAudio.currentTime - (data.currentTime || 0)) > 0.5) {
-                        globalAudio.currentTime = data.currentTime || 0; 
+                        globalAudio.currentTime = data.currentTime || 0;
                     }
-                } catch(e){}
+                } catch (e) { }
                 globalAudio.play().catch(e => console.error("Audio Error:", e));
             };
-            
+
             if (data.url) {
                 const fullUrl = new URL(data.url, window.location.origin).href;
                 if (globalAudio.src !== fullUrl) {
@@ -2078,7 +2401,7 @@
             audioVolume.value = data.volume !== undefined ? data.volume : 0.5;
             audioVolLabel.innerText = Math.round(audioVolume.value * 100) + '%';
             if (data.volume !== undefined) globalAudio.volume = data.volume;
-            
+
             if (data.playing) {
                 playAudioWithState(data);
             } else {
@@ -2092,7 +2415,7 @@
                 }
                 globalAudio.pause();
                 if (globalAudio.readyState >= 1) {
-                    try { globalAudio.currentTime = data.currentTime || 0; } catch(e){}
+                    try { globalAudio.currentTime = data.currentTime || 0; } catch (e) { }
                 }
             }
         });
@@ -2103,11 +2426,11 @@
 
         socket.on('audio:pause', (data) => {
             globalAudio.pause();
-            try { globalAudio.currentTime = data.currentTime || 0; } catch(e){}
+            try { globalAudio.currentTime = data.currentTime || 0; } catch (e) { }
         });
-        
+
         socket.on('audio:seek', (data) => {
-            try { globalAudio.currentTime = data.currentTime; } catch(e){}
+            try { globalAudio.currentTime = data.currentTime; } catch (e) { }
         });
 
         socket.on('audio:volume', (data) => {
@@ -2120,7 +2443,7 @@
         function toggleToolPanel(panelId, btnElement) {
             const panel = document.getElementById(panelId);
             const isCurrentlyActive = panel.classList.contains('active');
-            
+
             // Fecha todos os painéis e sidebars e remove "active" dos botões
             document.querySelectorAll('.tool-panel').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
@@ -2136,7 +2459,7 @@
                 }
             }
         }
-        
+
         // Fechar painéis ao clicar fora
         document.addEventListener('mousedown', (e) => {
             if (!e.target.closest('#floating-toolbar')) {
@@ -2150,14 +2473,14 @@
         const obsHeight = 1080;
         const canvasPadding = 4000;
         let currentScale = 0.3; // Zoom inicial da tela
-        
+
         // Dicionário local para mídias
         const mediaState = {};
 
         // Controle de Zoom da Tela
         function updateScale(newScale, mouseX = null, mouseY = null) {
             let contentX = 0, contentY = 0;
-            
+
             if (mouseX !== null && mouseY !== null) {
                 const rect = canvasWrapper.getBoundingClientRect();
                 contentX = mouseX - rect.left;
@@ -2167,13 +2490,13 @@
             const oldScale = currentScale;
             currentScale = Math.max(0.05, Math.min(newScale, 2)); // 5% a 200%
             zoomLevelDisplay.innerText = Math.round(currentScale * 100) + '%';
-            
+
             // Applica o transform no virtual-canvas (internamente)
             virtualCanvas.style.transform = `scale(${currentScale})`;
-            
+
             const newWidth = (obsWidth + canvasPadding * 2) * currentScale;
             const newHeight = (obsHeight + canvasPadding * 2) * currentScale;
-            
+
             // O canvas-wrapper assume o tamanho real estrutural para sumir com as scrollbars desnecessárias
             canvasWrapper.style.width = newWidth + 'px';
             canvasWrapper.style.height = newHeight + 'px';
@@ -2190,18 +2513,18 @@
             } else {
                 canvasWrapper.style.marginTop = '0px';
             }
-            
+
             // Se tivermos foco (posição do mouse no scroll), ajustamos o scroll do workspace para dar o zoom no ponto correto
             if (mouseX !== null && mouseY !== null) {
                 // Cálculo para manter o mouse no mesmo ponto após o zoom
                 const scaleRatio = currentScale / oldScale;
                 const newContentX = contentX * scaleRatio;
                 const newContentY = contentY * scaleRatio;
-                
+
                 const rectWorkspace = workspace.getBoundingClientRect();
                 const mouseXInWorkspace = mouseX - rectWorkspace.left;
                 const mouseYInWorkspace = mouseY - rectWorkspace.top;
-                
+
                 const newMl = parseFloat(canvasWrapper.style.marginLeft) || 0;
                 const newMt = parseFloat(canvasWrapper.style.marginTop) || 0;
 
@@ -2248,7 +2571,7 @@
             selectedElements.add(id);
             const el = document.getElementById(`admin-${id}`);
             if (el) el.classList.add('selected');
-            
+
             const media = mediaState[id];
             if (media && selectedElements.size === 1) {
                 btnCtxHide.innerHTML = media.visible ? '👁️' : '🙈';
@@ -2269,7 +2592,7 @@
 
         function duplicateSelectedMedia() {
             if (selectedElements.size === 0) return;
-            
+
             const newIds = [];
             let maxZ = 0;
             Object.values(mediaState).forEach(m => {
@@ -2354,7 +2677,7 @@
                             const cT = Math.round(crop.t), cR = Math.round(crop.r), cB = Math.round(crop.b), cL = Math.round(crop.l);
                             const visibleWidth = Math.round(Math.max(1, baseWidth - cL - cR));
                             const visibleHeight = Math.round(Math.max(1, baseHeight - cT - cB));
-                            
+
                             // Calcula a escala esticando exatamente para o limite (Non-Proportional)
                             const scaleX = 1920 / visibleWidth;
                             const scaleY = 1080 / visibleHeight;
@@ -2396,7 +2719,7 @@
                 let anyVisible = false;
                 selectedElements.forEach(id => { if (mediaState[id] && mediaState[id].visible) anyVisible = true; });
                 const newState = !anyVisible;
-                
+
                 selectedElements.forEach(id => {
                     const media = mediaState[id];
                     const container = document.getElementById(`admin-${id}`);
@@ -2411,13 +2734,13 @@
                     }
                 });
                 if (selectedElements.size === 1) btnCtxHide.innerText = newState ? '👁️' : '🙈'; btnCtxHide.title = newState ? 'Ocultar' : 'Mostrar';
-             }
+            }
 
             // Mostra o sistema de Crop ao segurar o Alt
             if (e.key === 'Alt' && !document.body.classList.contains('alt-pressed')) {
                 document.body.classList.add('alt-pressed');
             }
-            
+
             if (e.code === 'Space') {
                 isSpacePressed = true;
                 workspace.style.cursor = 'grab';
@@ -2453,7 +2776,7 @@
         const marqueeBox = document.getElementById('marquee-box');
 
         workspace.addEventListener('mousedown', (e) => {
-            if (e.target === workspace || e.target === virtualCanvas || e.target === canvasWrapper || e.target.id === 'obs-bounds') { 
+            if (e.target === workspace || e.target === virtualCanvas || e.target === canvasWrapper || e.target.id === 'obs-bounds') {
                 if (e.button === 1 || (e.button === 0 && isSpacePressed)) { // Middle click ou Space + Left click
                     isPanning = true;
                     workspace.style.cursor = 'grabbing';
@@ -2462,9 +2785,9 @@
                     scrollStartX = workspace.scrollLeft;
                     scrollStartY = workspace.scrollTop;
                     e.preventDefault();
-                    
+
                     clearSelection();
-                    
+
                     if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
                         document.activeElement.blur();
                     }
@@ -2479,7 +2802,7 @@
                     marqueeBox.style.top = marqueeStartY + 'px';
                     marqueeBox.style.width = '0px';
                     marqueeBox.style.height = '0px';
-                    
+
                     if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
                         document.activeElement.blur();
                     }
@@ -2494,7 +2817,7 @@
                 workspace.scrollLeft = scrollStartX - dx;
                 workspace.scrollTop = scrollStartY - dy;
             }
-            
+
             if (isMarquee) {
                 const rect = canvasWrapper.getBoundingClientRect();
                 const currentX = (e.clientX - rect.left) / currentScale;
@@ -2514,16 +2837,16 @@
                     const el = document.getElementById(`admin-${media.id}`);
                     const contentEl = el ? el.querySelector('.media-content') : null;
                     if (!el || !contentEl) return;
-                    
+
                     const elLeft = media.x + canvasPadding;
                     const elTop = media.y + canvasPadding;
                     const w = contentEl.offsetWidth * (media.scaleX || media.scale || 1);
                     const h = contentEl.offsetHeight * (media.scaleY || media.scale || 1);
 
                     const overlap = !(elLeft > left + width ||
-                                      elLeft + w < left ||
-                                      elTop > top + height ||
-                                      elTop + h < top);
+                        elLeft + w < left ||
+                        elTop > top + height ||
+                        elTop + h < top);
 
                     if (overlap) {
                         if (!selectedElements.has(media.id)) selectElement(media.id, true);
@@ -2568,24 +2891,24 @@
                     method: 'POST',
                     body: formData
                 })
-                .then(res => res.json())
-                .then(data => {
-                    overlay.classList.remove('show');
-                    if (data.url) {
-                        if (file.type.startsWith('audio/')) {
-                            loadAudioUploads();
-                            document.getElementById('soundpad-sidebar').classList.add('open');
-                        } else {
-                            createMediaFromUrl(data.url, canvasX, canvasY);
-                            if (typeof loadMediaUploads === "function") loadMediaUploads();
+                    .then(res => res.json())
+                    .then(data => {
+                        overlay.classList.remove('show');
+                        if (data.url) {
+                            if (file.type.startsWith('audio/')) {
+                                loadAudioUploads();
+                                document.getElementById('soundpad-sidebar').classList.add('open');
+                            } else {
+                                createMediaFromUrl(data.url, canvasX, canvasY);
+                                if (typeof loadMediaUploads === "function") loadMediaUploads();
+                            }
                         }
-                    }
-                })
-                .catch(err => {
-                    console.error('Erro no upload:', err);
-                    overlay.classList.remove('show');
-                    alert('Erro ao enviar o arquivo.');
-                });
+                    })
+                    .catch(err => {
+                        console.error('Erro no upload:', err);
+                        overlay.classList.remove('show');
+                        alert('Erro ao enviar o arquivo.');
+                    });
             } else {
                 alert('Formato de arquivo não suportado. Envie Imagens, Vídeos ou Áudios.');
             }
@@ -2699,10 +3022,10 @@
         // ============================================
         workspace.addEventListener('wheel', (e) => {
             if (!navModeSelect) return; // Segurança contra falhas
-            
+
             const draggable = e.target.closest('.draggable');
             const isMouseMode = navModeSelect.value === 'mouse';
-            
+
             // Verifica suavidade do scroll para dar suporte perfeito a trackpads e mouses
             let zoomAmount;
             if (Math.abs(e.deltaY) < 50) {
@@ -2718,7 +3041,7 @@
 
             if (isZoomIntent) {
                 e.preventDefault(); // Trava a movimentação para aplicar apenas o zoom
-                
+
                 if (draggable && !isPanning) {
                     // Escala Uniforme da Mídia
                     const id = draggable.id.replace('admin-', '');
@@ -2769,7 +3092,7 @@
                 }
                 return;
             }
-            
+
             // Se for movimento puro no Trackpad, a função chega aqui sem chamar e.preventDefault(),
             // permitindo que o navegador mova a tela lindamente sozinho.
         }, { passive: false });
@@ -2779,11 +3102,11 @@
         btnAdd.addEventListener('click', () => {
             const url = urlInput.value.trim();
             if (!url) return alert('Por favor, insira uma URL válida.');
-            
+
             const id = 'media_' + Math.random().toString(36).substring(2, 9);
-            
+
             // Posição inicial: na borda esquerda dos "bastidores", com offset visível
-            const initialX = canvasPadding - 200; 
+            const initialX = canvasPadding - 200;
             const initialY = canvasPadding + 100;
 
             const mediaData = {
@@ -2806,11 +3129,11 @@
         btnAddText.addEventListener('click', () => {
             const text = textInput.value.trim();
             if (!text) return alert('Por favor, digite um texto.');
-            
+
             const color = textColorInput.value;
             const id = 'media_' + Math.random().toString(36).substring(2, 9);
-            
-            const initialX = canvasPadding - 200; 
+
+            const initialX = canvasPadding - 200;
             const initialY = canvasPadding + 100;
 
             const mediaData = {
@@ -2838,7 +3161,7 @@
 
         socket.on('sync_state', (stateList) => {
             document.querySelectorAll('.draggable').forEach(el => el.remove());
-            
+
             stateList.forEach(data => {
                 const canvasX = data.x + canvasPadding;
                 const canvasY = data.y + canvasPadding;
@@ -3022,7 +3345,7 @@
         let resizeStartScaleY = 1;
         let resizeBaseWidth = 0;
         let resizeBaseHeight = 0;
-        
+
         let activeCropElement = null;
 
         let activeRotateElement = null;
@@ -3032,7 +3355,7 @@
         let rotateCenterY = 0;
         let rotateStartMediaX = 0;
         let rotateStartMediaY = 0;
-        
+
         let resizeStartMediaX = 0;
         let resizeStartMediaY = 0;
 
@@ -3054,12 +3377,12 @@
             container.style.left = startX + 'px';
             container.style.top = startY + 'px';
             container.style.zIndex = data.zIndex !== undefined ? data.zIndex : 10;
-            
+
             const sx = data.scaleX !== undefined ? data.scaleX : (data.scale || 1);
             const sy = data.scaleY !== undefined ? data.scaleY : (data.scale || 1);
             const rot = data.rotation || 0;
             container.style.transform = `rotate(${rot}deg) scale(${sx}, ${sy})`;
-            
+
             if (!data.visible) container.classList.add('hidden-media');
 
             // A Mídia em si
@@ -3085,7 +3408,7 @@
                     mediaEl.style.WebkitUserSelect = 'text';
                     mediaEl.focus();
                     mediaEl.style.cursor = 'text';
-                    
+
                     const selection = window.getSelection();
                     const range = document.createRange();
                     range.selectNodeContents(mediaEl);
@@ -3162,24 +3485,24 @@
                 <div class="crop-edge crop-bl" data-edge="bl"></div>
                 <div class="crop-edge crop-br" data-edge="br"></div>
             `;
-            
+
             cropUI.addEventListener('mousedown', (e) => {
                 if (e.target.classList.contains('crop-edge')) {
                     e.preventDefault();
                     e.stopPropagation();
-                    
+
                     selectElement(data.id);
                     activeCropElement = { element: container, id: data.id, edge: e.target.getAttribute('data-edge') };
                     resizeStartMouseX = e.clientX;
                     resizeStartMouseY = e.clientY;
                     resizeStartScaleX = mediaState[data.id].scaleX !== undefined ? mediaState[data.id].scaleX : (mediaState[data.id].scale || 1);
                     resizeStartScaleY = mediaState[data.id].scaleY !== undefined ? mediaState[data.id].scaleY : (mediaState[data.id].scale || 1);
-                    
+
                     const crop = mediaState[data.id].crop || { t: 0, r: 0, b: 0, l: 0 };
                     let uiT = Math.round(crop.t), uiR = Math.round(crop.r), uiB = Math.round(crop.b), uiL = Math.round(crop.l);
                     if (mediaState[data.id].flipX) { uiL = Math.round(crop.r); uiR = Math.round(crop.l); }
                     if (mediaState[data.id].flipY) { uiT = Math.round(crop.b); uiB = Math.round(crop.t); }
-                    
+
                     resizeStartCropT = uiT; resizeStartCropR = uiR; resizeStartCropB = uiB; resizeStartCropL = uiL;
                     resizeStartMediaX = mediaState[data.id].x;
                     resizeStartMediaY = mediaState[data.id].y;
@@ -3193,7 +3516,7 @@
 
             // Aplica espelhamentos, rotação e cortes que já vêm do servidor
             applyTransform(data.id);
-            
+
             if (mediaEl.tagName === 'IMG') {
                 mediaEl.onload = () => { applyTransform(data.id); updateSelectionUI(); };
             } else if (mediaEl.tagName === 'VIDEO') {
@@ -3203,7 +3526,7 @@
             // Eventos do mouse para arrastar a imagem
             container.addEventListener('mousedown', (e) => {
                 if (mediaEl.contentEditable === "true") return;
-                
+
                 // Tira o foco de caixas de texto para permitir os atalhos de teclado funcionarem
                 if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
                     document.activeElement.blur();
@@ -3279,7 +3602,7 @@
             const rectVirtual = virtualCanvas.getBoundingClientRect();
             const mouseX_inCanvasGlobal = (e.clientX - rectVirtual.left) / currentScale;
             const mouseY_inCanvasGlobal = (e.clientY - rectVirtual.top) / currentScale;
-            
+
             adminMouseMoveData = {
                 id: socket.id,
                 x: mouseX_inCanvasGlobal,
@@ -3287,7 +3610,7 @@
                 name: adminNameInput.value,
                 color: adminColorInput.value
             };
-            
+
             // Limita a emissão do cursor para os outros admins a ~20 FPS (50ms) para não entupir a rede
             const now = Date.now();
             if (now - lastMouseMoveEmitTime > 50) {
@@ -3298,16 +3621,16 @@
             if (activeRotateElement && !isPanning) {
                 const angle = Math.atan2(e.clientY - rotateCenterY, e.clientX - rotateCenterX);
                 let angleDiff = (angle - rotateStartAngle) * 180 / Math.PI;
-                
+
                 let newRotation = rotateStartRotation + angleDiff;
                 if (e.shiftKey) {
                     newRotation = Math.round(newRotation / 45) * 45;
                 }
-                
+
                 setRotationAroundCenter(activeRotateElement.id, newRotation, rotateStartMediaX, rotateStartMediaY, rotateStartRotation);
                 mediaState[activeRotateElement.id].isFullScreen = false;
                 applyTransform(activeRotateElement.id);
-                
+
                 const container = activeRotateElement.element;
                 if (container) {
                     container.style.left = (mediaState[activeRotateElement.id].x + canvasPadding) + 'px';
@@ -3323,7 +3646,7 @@
                     y: mediaState[activeRotateElement.id].y
                 };
                 pendingTransformSync = true;
-                
+
                 dragSyncDataMap[activeRotateElement.id] = {
                     id: activeRotateElement.id,
                     x: mediaState[activeRotateElement.id].x,
@@ -3336,13 +3659,13 @@
             if (activeCropElement && !isPanning) {
                 const dx = e.clientX - resizeStartMouseX;
                 const dy = e.clientY - resizeStartMouseY;
-                
+
                 const canvasDx = dx / currentScale;
                 const canvasDy = dy / currentScale;
 
                 const rot = mediaState[activeCropElement.id].rotation || 0;
                 const rad = -rot * Math.PI / 180;
-                
+
                 const unrotatedDx = canvasDx * Math.cos(rad) - canvasDy * Math.sin(rad);
                 const unrotatedDy = canvasDx * Math.sin(rad) + canvasDy * Math.cos(rad);
 
@@ -3363,7 +3686,7 @@
                 newUiR = Math.max(0, Math.min(newUiR, resizeBaseWidth - newUiL - 10));
 
                 let newCrop = { t: newUiT, r: newUiR, b: newUiB, l: newUiL };
-                
+
                 if (mediaState[activeCropElement.id].flipX) { newCrop.l = newUiR; newCrop.r = newUiL; }
                 if (mediaState[activeCropElement.id].flipY) { newCrop.t = newUiB; newCrop.b = newUiT; }
 
@@ -3403,14 +3726,14 @@
             if (activeResizeElement && !isPanning) {
                 const dx = e.clientX - resizeStartMouseX;
                 const dy = e.clientY - resizeStartMouseY;
-                
+
                 // Converter para a escala do canvas virtual
                 const canvasDx = dx / currentScale;
                 const canvasDy = dy / currentScale;
 
                 const rot = mediaState[activeResizeElement.id].rotation || 0;
                 const rad = -rot * Math.PI / 180;
-                
+
                 const unrotatedDx = canvasDx * Math.cos(rad) - canvasDy * Math.sin(rad);
                 const unrotatedDy = canvasDx * Math.sin(rad) + canvasDy * Math.cos(rad);
 
@@ -3431,7 +3754,7 @@
                 mediaState[activeResizeElement.id].scaleX = newSx;
                 mediaState[activeResizeElement.id].scaleY = newSy;
                 mediaState[activeResizeElement.id].isFullScreen = false;
-                
+
                 applyTransform(activeResizeElement.id);
 
                 scaleSyncData = { id: activeResizeElement.id, scaleX: newSx, scaleY: newSy };
@@ -3441,20 +3764,20 @@
 
             if (activeDragElements && activeDragElements.length > 0 && !isPanning) {
                 const rect = virtualCanvas.getBoundingClientRect();
-                
+
                 const mouseX_inCanvas = (e.clientX - rect.left) / currentScale;
                 const mouseY_inCanvas = (e.clientY - rect.top) / currentScale;
 
                 activeDragElements.forEach(dragData => {
                     const newLeft = mouseX_inCanvas - dragData.offsetX;
                     const newTop = mouseY_inCanvas - dragData.offsetY;
-                    
+
                     dragData.element.style.left = newLeft + 'px';
                     dragData.element.style.top = newTop + 'px';
-                    
+
                     const newMediaX = Math.round(newLeft - canvasPadding);
                     const newMediaY = Math.round(newTop - canvasPadding);
-                    
+
                     if (mediaState[dragData.id]) {
                         mediaState[dragData.id].x = newMediaX;
                         mediaState[dragData.id].y = newMediaY;
@@ -3482,7 +3805,7 @@
             activeRotateElement = null;
             activeCropElement = null;
         });
-        
+
         window.addEventListener('mouseleave', () => {
             activeDragElements = [];
             activeResizeElement = null;
@@ -3490,7 +3813,7 @@
             activeCropElement = null;
         });
 
-         // ============================================
+        // ============================================
         // EVENTOS DA NOVA BARRA GLOBAL E RESIZE
         // ============================================
         btnCtxLayerUp.addEventListener('click', () => {
@@ -3503,8 +3826,8 @@
                 }
             }
             if (maxOtherZ === -Infinity) maxOtherZ = 10;
-            
-            let sortedSelected = Array.from(selectedElements).sort((a,b) => (mediaState[a].zIndex || 10) - (mediaState[b].zIndex || 10));
+
+            let sortedSelected = Array.from(selectedElements).sort((a, b) => (mediaState[a].zIndex || 10) - (mediaState[b].zIndex || 10));
             let startZ = maxOtherZ + 1;
             sortedSelected.forEach(id => {
                 mediaState[id].zIndex = startZ;
@@ -3525,8 +3848,8 @@
                 }
             }
             if (minOtherZ === Infinity) minOtherZ = 10;
-            
-            let sortedSelected = Array.from(selectedElements).sort((a,b) => (mediaState[b].zIndex || 10) - (mediaState[a].zIndex || 10));
+
+            let sortedSelected = Array.from(selectedElements).sort((a, b) => (mediaState[b].zIndex || 10) - (mediaState[a].zIndex || 10));
             let startZ = minOtherZ - 1;
             sortedSelected.forEach(id => {
                 mediaState[id].zIndex = startZ;
@@ -3540,7 +3863,7 @@
         btnCtxHide.addEventListener('click', () => {
             if (selectedElements.size === 0) return;
             let anyVisible = false;
-            selectedElements.forEach(id => { if(mediaState[id].visible) anyVisible = true; });
+            selectedElements.forEach(id => { if (mediaState[id].visible) anyVisible = true; });
             const newState = !anyVisible;
             selectedElements.forEach(id => {
                 mediaState[id].visible = newState;
@@ -3598,7 +3921,7 @@
                 const video = container ? container.querySelector('video') : null;
                 if (video) {
                     video.muted = newState;
-                    if(mediaState[id]) mediaState[id].muted = newState;
+                    if (mediaState[id]) mediaState[id].muted = newState;
                     socket.emit('media:video_mute', { id: id, muted: newState });
                 }
             });
@@ -3658,7 +3981,7 @@
             if (selectedElements.size !== 1) return;
             e.stopPropagation();
             e.preventDefault();
-            
+
             const id = Array.from(selectedElements)[0];
             const container = document.getElementById(`admin-${id}`);
 
@@ -3666,29 +3989,29 @@
 
             resizeStartMouseX = e.clientX;
             resizeStartMouseY = e.clientY;
-            
+
             resizeStartScaleX = mediaState[id].scaleX !== undefined ? mediaState[id].scaleX : (mediaState[id].scale || 1);
             resizeStartScaleY = mediaState[id].scaleY !== undefined ? mediaState[id].scaleY : (mediaState[id].scale || 1);
-            
+
 
             const contentEl = container.querySelector('.media-content');
             const baseWidth = contentEl ? contentEl.offsetWidth : 100;
             const baseHeight = contentEl ? contentEl.offsetHeight : 100;
-            
+
             const crop = mediaState[id].crop || { t: 0, r: 0, b: 0, l: 0 };
             let uiT = Math.round(crop.t), uiR = Math.round(crop.r), uiB = Math.round(crop.b), uiL = Math.round(crop.l);
             if (mediaState[id].flipX) { uiL = Math.round(crop.r); uiR = Math.round(crop.l); }
             if (mediaState[id].flipY) { uiT = Math.round(crop.b); uiB = Math.round(crop.t); }
-            
+
             resizeBaseWidth = Math.max(1, Math.round(baseWidth) - uiL - uiR);
             resizeBaseHeight = Math.max(1, Math.round(baseHeight) - uiT - uiB);
         });
-        
+
         globalRotateHandle.addEventListener('mousedown', (e) => {
             if (selectedElements.size !== 1) return;
             e.stopPropagation();
             e.preventDefault();
-            
+
             const id = Array.from(selectedElements)[0];
             const container = document.getElementById(`admin-${id}`);
             const media = mediaState[id];
@@ -3701,7 +4024,7 @@
             const contentEl = container.querySelector('.media-content');
             const baseWidth = contentEl ? contentEl.offsetWidth : 100;
             const baseHeight = contentEl ? contentEl.offsetHeight : 100;
-            
+
             const crop = media.crop || { t: 0, r: 0, b: 0, l: 0 };
             let uiT = Math.round(crop.t), uiR = Math.round(crop.r), uiB = Math.round(crop.b), uiL = Math.round(crop.l);
             if (media.flipX) { uiL = Math.round(crop.r); uiR = Math.round(crop.l); }
@@ -3714,7 +4037,7 @@
             const unscaledCenterY = visibleHeight / 2;
             const scaledCenterX = unscaledCenterX * sx;
             const scaledCenterY = unscaledCenterY * sy;
-            
+
             const rad = rotateStartRotation * Math.PI / 180;
             const cx = scaledCenterX * Math.cos(rad) - scaledCenterY * Math.sin(rad);
             const cy = scaledCenterX * Math.sin(rad) + scaledCenterY * Math.cos(rad);
@@ -3723,7 +4046,7 @@
             const topPos = (media.y + canvasPadding) * currentScale;
 
             const rect = virtualCanvas.getBoundingClientRect();
-            
+
             rotateCenterX = rect.left + leftPos + cx * currentScale;
             rotateCenterY = rect.top + topPos + cy * currentScale;
 
@@ -3751,7 +4074,7 @@
                 // Como ele está dentro do virtual-canvas, ele será escalado junto com o canvas.
                 // Mas talvez seja melhor que ele tenha um tamanho fixo visual.
                 // Vamos tentar deixar que escale para ficar simples, ou aplicar um transform inverso.
-                
+
                 const svg = document.createElement('div');
                 svg.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5));">
 <path d="M4.5 3L20 10.5L13.5 13.5L10.5 20L4.5 3Z" fill="${data.color}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
@@ -3783,7 +4106,7 @@
             cursors[data.id].element.style.transform = `scale(${1 / currentScale})`;
             cursors[data.id].element.style.left = data.x + 'px';
             cursors[data.id].element.style.top = data.y + 'px';
-            
+
             // Atualizar nome/cor se mudou
             cursors[data.id].nameLabel.innerText = data.name || 'Admin';
             cursors[data.id].nameLabel.style.backgroundColor = data.color;
@@ -3848,12 +4171,12 @@
 
             emitterId = data.emitterId;
 
-                if (webrtcPeerConnection) {
-                    webrtcPeerConnection.close();
-                }
-                iceCandidateQueue = [];
+            if (webrtcPeerConnection) {
+                webrtcPeerConnection.close();
+            }
+            iceCandidateQueue = [];
 
-                webrtcPeerConnection = new RTCPeerConnection({
+            webrtcPeerConnection = new RTCPeerConnection({
                 iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
             });
             iceCandidateQueue = [];
@@ -3864,7 +4187,7 @@
                 if (remoteVideo.srcObject !== stream) {
                     remoteVideo.srcObject = stream;
                 }
-                
+
                 remoteVideo.play().catch(e => {
                     console.error("Autoplay bloqueado pelo navegador. Tentando mutado...", e);
                     remoteVideo.muted = true;
@@ -3895,10 +4218,10 @@
                 await webrtcPeerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
                 const answer = await webrtcPeerConnection.createAnswer();
                 await webrtcPeerConnection.setLocalDescription(answer);
-                
+
                 // Envia a resposta de volta via Socket.io para o emissor específico
                 socket.emit('webrtc_answer', { answer: answer, targetId: emitterId });
-                
+
                 // Processa candidatos ICE em espera
                 while (iceCandidateQueue.length) {
                     webrtcPeerConnection.addIceCandidate(iceCandidateQueue.shift()).catch(e => console.error(e));
@@ -3941,6 +4264,28 @@
         const ttsCanvasCoords = document.getElementById('tts-canvas-coords');
         const ttsCustomFlip = document.getElementById('tts-custom-flip');
 
+        function updateCharPreview() {
+            const url = ttsImageUrl.value.trim();
+            if (url) {
+                ttsCanvasChar.style.backgroundImage = `url('${url}')`;
+                ttsCanvasChar.style.backgroundSize = 'contain';
+                ttsCanvasChar.style.backgroundRepeat = 'no-repeat';
+                ttsCanvasChar.style.backgroundPosition = 'center';
+                ttsCanvasChar.innerText = '';
+                ttsCanvasChar.style.backgroundColor = 'transparent';
+                ttsCanvasChar.style.border = 'none';
+            } else {
+                ttsCanvasChar.style.backgroundImage = 'none';
+                ttsCanvasChar.innerText = '??';
+                ttsCanvasChar.style.backgroundColor = 'rgba(0, 150, 255, 0.5)';
+                ttsCanvasChar.style.border = '2px solid #0096ff';
+            }
+        }
+
+        ttsImageUrl.addEventListener('input', updateCharPreview);
+        ttsImageUrl.addEventListener('change', updateCharPreview);
+        updateCharPreview();
+
         let customX = 80.0;
         let customY = 80.0;
 
@@ -3968,7 +4313,7 @@
                 ttsCustomPosContainer.style.display = 'none';
             }
         });
-        
+
         // Inicializa exibição
         if (ttsPosition.value === 'custom') ttsCustomPosContainer.style.display = 'flex';
 
@@ -4027,23 +4372,24 @@
                 const file = e.target.files[0];
                 const formData = new FormData();
                 formData.append('file', file);
-                
+
                 const overlay = document.getElementById('upload-overlay');
                 document.getElementById('upload-text').innerText = "Enviando imagem do TTS...";
                 overlay.classList.add('show');
 
                 fetch('/upload', { method: 'POST', body: formData })
-                .then(res => res.json())
-                .then(data => {
-                    overlay.classList.remove('show');
-                    if (data.url) {
-                        ttsImageUrl.value = data.url;
-                    }
-                })
-                .catch(err => {
-                    overlay.classList.remove('show');
-                    alert('Erro no upload da imagem do TTS.');
-                });
+                    .then(res => res.json())
+                    .then(data => {
+                        overlay.classList.remove('show');
+                        if (data.url) {
+                            ttsImageUrl.value = data.url;
+                            updateCharPreview();
+                        }
+                    })
+                    .catch(err => {
+                        overlay.classList.remove('show');
+                        alert('Erro no upload da imagem do TTS.');
+                    });
             }
         });
 
@@ -4053,23 +4399,23 @@
                 const file = e.target.files[0];
                 const formData = new FormData();
                 formData.append('file', file);
-                
+
                 const overlay = document.getElementById('upload-overlay');
                 document.getElementById('upload-text').innerText = "Enviando áudio do TTS...";
                 overlay.classList.add('show');
 
                 fetch('/upload-audio', { method: 'POST', body: formData })
-                .then(res => res.json())
-                .then(data => {
-                    overlay.classList.remove('show');
-                    if (data.url) {
-                        ttsAudioUrl.value = data.url;
-                    }
-                })
-                .catch(err => {
-                    overlay.classList.remove('show');
-                    alert('Erro no upload do áudio do TTS.');
-                });
+                    .then(res => res.json())
+                    .then(data => {
+                        overlay.classList.remove('show');
+                        if (data.url) {
+                            ttsAudioUrl.value = data.url;
+                        }
+                    })
+                    .catch(err => {
+                        overlay.classList.remove('show');
+                        alert('Erro no upload do áudio do TTS.');
+                    });
             }
         });
 
@@ -4077,7 +4423,7 @@
         btnTtsSpeak.addEventListener('click', () => {
             const text = ttsText.value.trim();
             const audioUrl = ttsAudioUrl.value.trim();
-            
+
             if (!text && !audioUrl) {
                 alert('Digite um texto ou adicione um áudio para o personagem falar.');
                 return;
@@ -4101,7 +4447,6 @@
 
             // Optional: clear text after speaking
             ttsText.value = '';
-            document.getElementById('tts-sidebar').classList.remove('open');
         });
 
         // Handle Stop button click
@@ -4110,6 +4455,102 @@
         });
         // =======================================================
 
+
+        const ttsContainer = document.getElementById('tts-admin-preview');
+        const ttsImg = document.getElementById('tts-admin-img');
+        const ttsSubtitle = document.getElementById('tts-admin-subtitle');
+        let currentTtsAudio = null;
+
+
+        socket.on('character:speak', (data) => {
+            if (window.currentAdminTtsTimer) clearInterval(window.currentAdminTtsTimer);
+            if (currentTtsAudio) { currentTtsAudio.pause(); currentTtsAudio = null; }
+
+            if (data.imageUrl) { ttsImg.src = data.imageUrl; }
+            else { ttsImg.src = "https://cdn-icons-png.flaticon.com/512/4712/4712010.png"; }
+
+            ttsContainer.style.left = ''; ttsContainer.style.right = ''; ttsContainer.style.top = ''; ttsContainer.style.bottom = ''; ttsContainer.style.transform = '';
+
+            if (data.subtitleColor) {
+                document.documentElement.style.setProperty('--tts-active-color', data.subtitleColor);
+            }
+
+            if (data.position === 'left') {
+                ttsContainer.style.setProperty('--tts-hidden-top', 'auto'); ttsContainer.style.setProperty('--tts-hidden-bottom', '-400px'); ttsContainer.style.setProperty('--tts-hidden-left', '20px'); ttsContainer.style.setProperty('--tts-hidden-right', 'auto'); ttsContainer.style.setProperty('--tts-hidden-transform', 'none');
+                ttsContainer.style.setProperty('--tts-show-top', 'auto'); ttsContainer.style.setProperty('--tts-show-bottom', '20px'); ttsContainer.style.setProperty('--tts-show-left', '20px'); ttsContainer.style.setProperty('--tts-show-right', 'auto'); ttsContainer.style.setProperty('--tts-show-transform', 'none');
+                ttsImg.style.transform = 'scaleX(-1)';
+            } else if (data.position === 'custom') {
+                const cx = data.customX !== undefined ? data.customX : 80;
+                const cy = data.customY !== undefined ? data.customY : 80;
+                ttsContainer.style.setProperty('--tts-hidden-top', '150%'); ttsContainer.style.setProperty('--tts-hidden-bottom', 'auto'); ttsContainer.style.setProperty('--tts-hidden-left', cx + '%'); ttsContainer.style.setProperty('--tts-hidden-right', 'auto'); ttsContainer.style.setProperty('--tts-hidden-transform', 'translate(-50%, -50%)');
+                ttsContainer.style.setProperty('--tts-show-top', cy + '%'); ttsContainer.style.setProperty('--tts-show-bottom', 'auto'); ttsContainer.style.setProperty('--tts-show-left', cx + '%'); ttsContainer.style.setProperty('--tts-show-right', 'auto'); ttsContainer.style.setProperty('--tts-show-transform', 'translate(-50%, -50%)');
+                ttsImg.style.transform = data.customFlip ? 'scaleX(-1)' : 'scaleX(1)';
+            } else {
+                ttsContainer.style.setProperty('--tts-hidden-top', 'auto'); ttsContainer.style.setProperty('--tts-hidden-bottom', '-400px'); ttsContainer.style.setProperty('--tts-hidden-left', 'auto'); ttsContainer.style.setProperty('--tts-hidden-right', '20px'); ttsContainer.style.setProperty('--tts-hidden-transform', 'none');
+                ttsContainer.style.setProperty('--tts-show-top', 'auto'); ttsContainer.style.setProperty('--tts-show-bottom', '20px'); ttsContainer.style.setProperty('--tts-show-left', 'auto'); ttsContainer.style.setProperty('--tts-show-right', '20px'); ttsContainer.style.setProperty('--tts-show-transform', 'none');
+                ttsImg.style.transform = 'scaleX(1)';
+            }
+
+            ttsContainer.classList.add('show');
+
+            const hasText = !!data.text;
+            const hasAudio = !!data.audioUrl;
+            const behavior = data.audioBehavior || 'simultaneous';
+
+            const hideCharacter = () => {
+                ttsContainer.classList.remove('show');
+                ttsSubtitle.innerHTML = '';
+            };
+
+            const speakText = (onFinish) => {
+                if (!hasText) { if (onFinish) onFinish(); return; }
+
+                const regex = /\S+/g; let match; const words = [];
+                while ((match = regex.exec(data.text)) !== null) { words.push({ text: match[0], startIndex: match.index }); }
+
+                let currentWordIndex = -1;
+
+                window.currentAdminTtsTimer = setInterval(() => {
+                    currentWordIndex++;
+                    if (currentWordIndex >= words.length) {
+                        clearInterval(window.currentAdminTtsTimer);
+                        setTimeout(() => {
+                            if (ttsSubtitle) ttsSubtitle.innerHTML = '';
+                            if (onFinish) onFinish();
+                        }, 500);
+                        return;
+                    }
+                }, 400); // 400ms por palavra simulando leitura sem usar engine real
+            };
+
+            const playAudio = (onFinish) => {
+                if (!hasAudio) { if (onFinish) onFinish(); return; }
+                currentTtsAudio = new Audio(data.audioUrl);
+                currentTtsAudio.volume = 0; // MUTED for admin preview
+                currentTtsAudio.onended = () => { currentTtsAudio = null; if (onFinish) onFinish(); };
+                currentTtsAudio.onerror = () => { currentTtsAudio = null; if (onFinish) onFinish(); };
+                currentTtsAudio.play().catch(e => { currentTtsAudio = null; if (onFinish) onFinish(); });
+            };
+
+            if (behavior === 'audio_only' || (!hasText && hasAudio)) playAudio(hideCharacter);
+            else if (!hasAudio) speakText(hideCharacter);
+            else if (behavior === 'audio_before') playAudio(() => speakText(hideCharacter));
+            else if (behavior === 'audio_after') speakText(() => playAudio(hideCharacter));
+            else {
+                let finishedCount = 0;
+                const checkDone = () => { finishedCount++; if (finishedCount === 2) hideCharacter(); };
+                speakText(checkDone); playAudio(checkDone);
+            }
+        });
+
+        socket.on('character:stop', () => {
+            if (window.currentAdminTtsTimer) clearInterval(window.currentAdminTtsTimer);
+            if (currentTtsAudio) { currentTtsAudio.pause(); currentTtsAudio = null; }
+            ttsContainer.classList.remove('show');
+            if (ttsSubtitle) ttsSubtitle.innerHTML = '';
+        });
     </script>
+
 </body>
+
 </html>

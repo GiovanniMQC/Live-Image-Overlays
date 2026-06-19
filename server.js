@@ -508,11 +508,11 @@ io.on('connection', (socket) => {
     });
 
     socket.on('character:speak', (data) => {
-        socket.broadcast.emit('character:speak', data);
+        io.emit('character:speak', data);
     });
 
     socket.on('character:stop', () => {
-        socket.broadcast.emit('character:stop');
+        io.emit('character:stop');
     });
 
     socket.on('media:delete', (data) => {
