@@ -2669,7 +2669,28 @@
                 previewBtn.title = 'Parar Preview';
 
                 previewAudioInstance = new Audio(audio.url);
-                previewAudioInstance.volume = parseFloat(document.getElementById('audio-volume').value) || 0.5;
+                
+                // Calculo do volume (Volume Global * Volume Individual)
+                const globalVol = parseFloat(document.getElementById('audio-volume').value) || 0.5;
+                const indVol = audio.volume !== undefined ? parseFloat(audio.volume) : 1;
+                previewAudioInstance.volume = Math.min(globalVol * indVol, 1);
+                
+                // Tratamento do tempo de inicio e fim (Trim)
+                const startTime = audio.trimStart || 0;
+                const endTime = audio.trimEnd || null;
+
+                previewAudioInstance.currentTime = startTime;
+
+                if (endTime) {
+                    previewAudioInstance.ontimeupdate = () => {
+                        if (previewAudioInstance.currentTime >= endTime) {
+                            previewAudioInstance.pause();
+                            previewAudioInstance.currentTime = startTime; // Reseta para o início do trim
+                            previewBtn.innerHTML = '🎧';
+                            previewBtn.title = 'Preview (Ouvir localmente)';
+                        }
+                    };
+                }
 
                 previewAudioInstance.onended = () => {
                     previewBtn.innerHTML = '🎧';

@@ -121,7 +121,8 @@
     "url": "/audio_uploads/metal%20pipe%20falling%20sound%20effect.mp3",
     "pinned": false,
     "trimStart": 0.75,
-    "trimEnd": null
+    "trimEnd": null,
+    "volume": 1
   },
   {
     "id": "up-1781025002190vaqwbca",
