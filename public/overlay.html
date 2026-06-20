@@ -631,6 +631,7 @@
         const ttsSubtitle = document.getElementById('tts-subtitle');
         
         let currentTtsAudio = null;
+        let currentRvcAudio = null;
         let currentSubtitleTimeout = null;
 
         socket.on('character:speak', (data) => {
@@ -639,6 +640,10 @@
             if (currentTtsAudio) {
                 currentTtsAudio.pause();
                 currentTtsAudio = null;
+            }
+            if (currentRvcAudio) {
+                currentRvcAudio.pause();
+                currentRvcAudio = null;
             }
 
             // Atualiza imagem
@@ -728,97 +733,127 @@
                 ttsSubtitle.classList.remove('show');
             };
 
-            const speakText = (onFinish) => {
-                if (!hasText) {
+            const speakVoice = (onFinish) => {
+                let finishedRvc = !data.rvcAudioUrl;
+                let finishedTts = !hasText;
+                let isDone = false;
+
+                const checkVoiceDone = () => {
+                    if (isDone) return;
+                    if (!finishedRvc || !finishedTts) return;
+                    isDone = true;
                     if (onFinish) onFinish();
-                    return;
-                }
-                
-                const regex = /\S+/g;
-                let match;
-                const words = [];
-                while ((match = regex.exec(data.text)) !== null) {
-                    words.push({
-                        text: match[0],
-                        startIndex: match.index
+                };
+
+                if (data.rvcAudioUrl) {
+                    currentRvcAudio = new Audio(data.rvcAudioUrl);
+                    currentRvcAudio.onended = () => {
+                        currentRvcAudio = null;
+                        finishedRvc = true;
+                        checkVoiceDone();
+                    };
+                    currentRvcAudio.onerror = () => {
+                        currentRvcAudio = null;
+                        finishedRvc = true;
+                        checkVoiceDone();
+                    };
+                    currentRvcAudio.play().catch(e => {
+                        console.error("Erro ao tocar áudio RVC:", e);
+                        if (e.name === 'NotAllowedError') {
+                            document.getElementById('interaction-overlay').style.display = 'flex';
+                        }
+                        currentRvcAudio = null;
+                        finishedRvc = true;
+                        checkVoiceDone();
                     });
                 }
 
-                let currentWordIndex = -1;
-                let currentChunkStartIndex = -1;
-
-                const utterance = new SpeechSynthesisUtterance(data.text);
-                utterance.lang = 'pt-BR';
-                if (data.muteBrowserTts) {
-                    utterance.volume = 0;
-                }
-                
-                utterance.onboundary = (event) => {
-                    if (event.name !== 'word') return;
-                    
-                    let spokenWordIndex = -1;
-                    for (let i = words.length - 1; i >= 0; i--) {
-                        if (event.charIndex >= words[i].startIndex) {
-                            spokenWordIndex = i;
-                            break;
-                        }
+                if (hasText) {
+                    const regex = /\S+/g;
+                    let match;
+                    const words = [];
+                    while ((match = regex.exec(data.text)) !== null) {
+                        words.push({ text: match[0], startIndex: match.index });
                     }
 
-                    if (spokenWordIndex !== -1 && spokenWordIndex !== currentWordIndex) {
-                        currentWordIndex = spokenWordIndex;
+                    let currentWordIndex = -1;
+                    let currentChunkStartIndex = -1;
 
-                        // Sincroniza a animação
-                        if (data.animation && data.animation !== 'none') {
-                            ttsContainer.classList.remove(`anim-${data.animation}-sync`);
-                            void ttsContainer.offsetWidth; // Force reflow
-                            ttsContainer.classList.add(`anim-${data.animation}-sync`);
-                        }
+                    const utterance = new SpeechSynthesisUtterance(data.text);
+                    utterance.lang = 'pt-BR';
+                    if (data.muteBrowserTts) {
+                        utterance.volume = 0;
+                    }
+                    
+                    utterance.onboundary = (event) => {
+                        if (event.name !== 'word') return;
                         
-                        const chunkStartIndex = Math.floor(spokenWordIndex / 3) * 3;
-                        
-                        if (chunkStartIndex !== currentChunkStartIndex) {
-                            currentChunkStartIndex = chunkStartIndex;
-                            ttsSubtitle.innerHTML = '';
-                            
-                            for (let i = chunkStartIndex; i < chunkStartIndex + 3 && i < words.length; i++) {
-                                const span = document.createElement('span');
-                                span.innerText = words[i].text + ' ';
-                                span.id = 'tts-word-' + i;
-                                span.className = 'tts-word-hidden';
-                                ttsSubtitle.appendChild(span);
+                        let spokenWordIndex = -1;
+                        for (let i = words.length - 1; i >= 0; i--) {
+                            if (event.charIndex >= words[i].startIndex) {
+                                spokenWordIndex = i;
+                                break;
                             }
                         }
 
-                        // Atualiza as classes das palavras do chunk atual
-                        for (let i = chunkStartIndex; i < chunkStartIndex + 3 && i < words.length; i++) {
-                            const span = document.getElementById('tts-word-' + i);
-                            if (span) {
-                                if (i < spokenWordIndex) {
-                                    span.className = 'tts-word-visible';
-                                } else if (i === spokenWordIndex) {
-                                    setTimeout(() => {
-                                        span.className = 'tts-word-active';
-                                    }, 10);
-                                } else {
+                        if (spokenWordIndex !== -1 && spokenWordIndex !== currentWordIndex) {
+                            currentWordIndex = spokenWordIndex;
+
+                            if (data.animation && data.animation !== 'none') {
+                                ttsContainer.classList.remove(`anim-${data.animation}-sync`);
+                                void ttsContainer.offsetWidth; // Force reflow
+                                ttsContainer.classList.add(`anim-${data.animation}-sync`);
+                            }
+                            
+                            const chunkStartIndex = Math.floor(spokenWordIndex / 3) * 3;
+                            
+                            if (chunkStartIndex !== currentChunkStartIndex) {
+                                currentChunkStartIndex = chunkStartIndex;
+                                ttsSubtitle.innerHTML = '';
+                                
+                                for (let i = chunkStartIndex; i < chunkStartIndex + 3 && i < words.length; i++) {
+                                    const span = document.createElement('span');
+                                    span.innerText = words[i].text + ' ';
+                                    span.id = 'tts-word-' + i;
                                     span.className = 'tts-word-hidden';
+                                    ttsSubtitle.appendChild(span);
+                                }
+                            }
+
+                            for (let i = chunkStartIndex; i < chunkStartIndex + 3 && i < words.length; i++) {
+                                const span = document.getElementById('tts-word-' + i);
+                                if (span) {
+                                    if (i < spokenWordIndex) {
+                                        span.className = 'tts-word-visible';
+                                    } else if (i === spokenWordIndex) {
+                                        setTimeout(() => { span.className = 'tts-word-active'; }, 10);
+                                    } else {
+                                        span.className = 'tts-word-hidden';
+                                    }
                                 }
                             }
                         }
-                    }
-                };
+                    };
 
-                utterance.onend = () => { 
-                    ttsSubtitle.innerHTML = '';
-                    if (onFinish) onFinish(); 
-                };
-                utterance.onerror = () => { 
-                    ttsSubtitle.innerHTML = '';
-                    if (onFinish) onFinish(); 
-                };
-                window.speechSynthesis.speak(utterance);
+                    utterance.onend = () => { 
+                        ttsSubtitle.innerHTML = '';
+                        finishedTts = true;
+                        checkVoiceDone();
+                    };
+                    utterance.onerror = () => { 
+                        ttsSubtitle.innerHTML = '';
+                        finishedTts = true;
+                        checkVoiceDone();
+                    };
+                    window.speechSynthesis.speak(utterance);
+                }
+
+                if (!data.rvcAudioUrl && !hasText) {
+                    checkVoiceDone();
+                }
             };
 
-            const playAudio = (onFinish) => {
+            const playCustomAudio = (onFinish) => {
                 if (!hasAudio) {
                     if (onFinish) onFinish();
                     return;
@@ -833,7 +868,7 @@
                     if (onFinish) onFinish();
                 };
                 currentTtsAudio.play().catch(e => {
-                    console.error("Erro ao tocar áudio do TTS:", e);
+                    console.error("Erro ao tocar áudio customizado:", e);
                     if (e.name === 'NotAllowedError') {
                         document.getElementById('interaction-overlay').style.display = 'flex';
                     }
@@ -842,17 +877,19 @@
                 });
             };
 
-            if (behavior === 'audio_only' || (!hasText && hasAudio)) {
-                playAudio(hideCharacter);
+            const hasVoice = hasText || !!data.rvcAudioUrl;
+
+            if (behavior === 'audio_only' || (!hasVoice && hasAudio)) {
+                playCustomAudio(hideCharacter);
             } else if (!hasAudio) {
-                speakText(hideCharacter);
+                speakVoice(hideCharacter);
             } else if (behavior === 'audio_before') {
-                playAudio(() => {
-                    speakText(hideCharacter);
+                playCustomAudio(() => {
+                    speakVoice(hideCharacter);
                 });
             } else if (behavior === 'audio_after') {
-                speakText(() => {
-                    playAudio(hideCharacter);
+                speakVoice(() => {
+                    playCustomAudio(hideCharacter);
                 });
             } else {
                 // simultaneous
@@ -861,8 +898,8 @@
                     finishedCount++;
                     if (finishedCount === 2) hideCharacter();
                 };
-                speakText(checkDone);
-                playAudio(checkDone);
+                speakVoice(checkDone);
+                playCustomAudio(checkDone);
             }
         });
 
@@ -871,6 +908,10 @@
             if (currentTtsAudio) {
                 currentTtsAudio.pause();
                 currentTtsAudio = null;
+            }
+            if (currentRvcAudio) {
+                currentRvcAudio.pause();
+                currentRvcAudio = null;
             }
             ttsContainer.classList.remove('show');
             if (ttsSubtitle) ttsSubtitle.classList.remove('show');

@@ -55,6 +55,18 @@ if (!fs.existsSync(audioUploadsDir)) {
     fs.mkdirSync(audioUploadsDir, { recursive: true });
 }
 
+// Diretório temporário para áudios gerados pelo RVC
+const rvcTempDir = path.join(__dirname, 'public', 'rvc_temp');
+if (!fs.existsSync(rvcTempDir)) {
+    fs.mkdirSync(rvcTempDir, { recursive: true });
+} else {
+    // Apaga os áudios RVC antigos ao iniciar o servidor
+    const files = fs.readdirSync(rvcTempDir);
+    for (const file of files) {
+        try { fs.unlinkSync(path.join(rvcTempDir, file)); } catch(e) {}
+    }
+}
+
 // Configuração do Multer para salvar os arquivos
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -504,8 +516,8 @@ app.get('/api/voices', (req, res) => {
 function generateRVCAudio(text, model, pitch) {
     return new Promise((resolve, reject) => {
         const timestamp = Date.now();
-        const piperOutPath = path.join(audioUploadsDir, `base_${timestamp}.wav`);
-        const rvcOutPath = path.join(audioUploadsDir, `rvc_${timestamp}.wav`);
+        const piperOutPath = path.join(__dirname, `temp_piper_${timestamp}.wav`);
+        const rvcOutPath = path.join(rvcTempDir, `rvc_${timestamp}.wav`);
         
         // Ensure text is safely escaped for echo
         const safeText = text.replace(/"/g, '\\"').replace(/\$/g, '\\$');
@@ -534,7 +546,7 @@ function generateRVCAudio(text, model, pitch) {
                     return reject('Falha ao clonar voz com RVC');
                 }
                 
-                resolve(`/audio_uploads/rvc_${timestamp}.wav`);
+                resolve(`/rvc_temp/rvc_${timestamp}.wav`);
             });
         });
     });
@@ -566,7 +578,7 @@ const uploadRecording = multer({ storage: recordingStorage });
 function processAudioWithRVC(inputAudioPath, model, pitch) {
     return new Promise((resolve, reject) => {
         const timestamp = Date.now();
-        const rvcOutPath = path.join(audioUploadsDir, `rvc_rec_${timestamp}.wav`);
+        const rvcOutPath = path.join(rvcTempDir, `rvc_rec_${timestamp}.wav`);
         // Convert webm → wav first using ffmpeg, then run RVC
         const convertCmd = `ffmpeg -y -i "${inputAudioPath}" "${inputAudioPath.replace('.webm', '.wav')}"`;
         const wavInputPath = inputAudioPath.replace('.webm', '.wav');
@@ -583,7 +595,7 @@ function processAudioWithRVC(inputAudioPath, model, pitch) {
                     console.error('RVC Error:', stderr2);
                     return reject('Falha ao clonar voz com RVC');
                 }
-                resolve(`/audio_uploads/rvc_rec_${timestamp}.wav`);
+                resolve(`/rvc_temp/rvc_rec_${timestamp}.wav`);
             });
         });
     });
@@ -611,13 +623,14 @@ app.post('/api/tts/record-rvc-live', uploadRecording.single('audio'), async (req
         io.emit('character:speak', {
             text: '',
             imageUrl: characterData.imageUrl,
-            audioUrl: audioUrl,
+            audioUrl: characterData.audioUrl,
+            audioBehavior: characterData.audioBehavior,
+            rvcAudioUrl: audioUrl, // Audio RVC (IA) gerado pela gravação
             subtitleColor: characterData.subtitleColor,
             position: characterData.position,
             customFlip: characterData.customFlip,
             customX: characterData.customX,
             customY: characterData.customY,
-            audioBehavior: 'simultaneous',
             muteBrowserTts: true,
             animation: characterData.animation || 'none'
         });
@@ -627,6 +640,25 @@ app.post('/api/tts/record-rvc-live', uploadRecording.single('audio'), async (req
     }
 });
 // ===============================================================
+
+app.get('/api/rvc-history', (req, res) => {
+    try {
+        const files = fs.readdirSync(rvcTempDir).filter(f => f.endsWith('.wav'));
+        const fileList = files.map(f => {
+            const stat = fs.statSync(path.join(rvcTempDir, f));
+            return {
+                name: f,
+                url: '/rvc_temp/' + encodeURIComponent(f),
+                mtime: stat.mtimeMs
+            };
+        });
+        // order by newest first
+        fileList.sort((a, b) => b.mtime - a.mtime);
+        res.json({ files: fileList });
+    } catch (e) {
+        res.status(500).json({ error: e });
+    }
+});
 
 app.post('/api/tts/live', express.json(), async (req, res) => {
     try {
@@ -639,14 +671,15 @@ app.post('/api/tts/live', express.json(), async (req, res) => {
         io.emit('character:speak', {
             text: text,
             imageUrl: characterData.imageUrl,
-            audioUrl: audioUrl,
+            audioUrl: characterData.audioUrl,
+            audioBehavior: characterData.audioBehavior,
+            rvcAudioUrl: audioUrl, // Audio RVC (IA)
             subtitleColor: characterData.subtitleColor,
             position: characterData.position,
             customFlip: characterData.customFlip,
             customX: characterData.customX,
             customY: characterData.customY,
-            audioBehavior: 'simultaneous',
-            muteBrowserTts: true, // Silencia o robô do browser, exibe legenda, toca áudio IA
+            muteBrowserTts: true, // Silencia o robô do browser, exibe legenda
             animation: characterData.animation || 'none'
         });
         
