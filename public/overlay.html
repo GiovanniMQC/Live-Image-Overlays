@@ -749,6 +749,9 @@
 
                 const utterance = new SpeechSynthesisUtterance(data.text);
                 utterance.lang = 'pt-BR';
+                if (data.muteBrowserTts) {
+                    utterance.volume = 0;
+                }
                 
                 utterance.onboundary = (event) => {
                     if (event.name !== 'word') return;

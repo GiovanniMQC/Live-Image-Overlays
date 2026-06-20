@@ -729,6 +729,7 @@
             z-index: 10000;
             display: flex;
             flex-direction: column;
+            overflow-y: auto;
             transition: right 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.05);
         }
 
@@ -1275,7 +1276,7 @@
         <div class="soundpad-controls" style="padding-bottom: 5px;">
             <button id="btn-save-tts-preset" class="btn-upload" style="background: #28a745; margin-bottom: 5px;">💾 Salvar Personagem Atual</button>
         </div>
-        <div class="soundpad-grid" id="tts-grid" style="margin-bottom: 10px; padding: 0 10px; max-height: 150px; overflow-y: auto;">
+        <div class="soundpad-grid" id="tts-grid" style="margin-bottom: 10px; padding: 0 10px; flex: none; min-height: 150px;">
             <!-- Personagens inseridos via JS -->
         </div>
         <div class="soundpad-controls" style="border-top: 1px solid #444; padding-top: 10px;">
@@ -1361,9 +1362,143 @@
                     style="flex: 1; padding: 10px; font-weight: bold; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Parar
                     ⏹️</button>
             </div>
+
+            <hr style="border-color: #333; margin: 15px 0;">
+            <h4 style="margin: 0 0 10px 0; color: #aaa;">🎙️ Gerador de Voz (IA - RVC)</h4>
+            <div class="input-group">
+                <label>Modelo RVC</label>
+                <select id="rvc-model" style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; width: 100%;">
+                    <option value="">Carregando vozes...</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Pitch: <span id="rvc-pitch-label">0</span></label>
+                <input type="range" id="rvc-pitch" min="-12" max="12" value="0" style="width: 100%;">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button id="btn-rvc-preview" class="btn-primary" style="flex: 1; padding: 10px;">Preview Local 🎧</button>
+                <button id="btn-rvc-live" class="btn-success" style="flex: 1; padding: 10px; font-weight: bold;">Enviar p/ Live 🔴</button>
+            </div>
+            
+            <div id="rvc-loading" style="display: none; margin-top: 10px; padding: 10px; background: #333; border-radius: 4px; text-align: center; color: #ffd700; font-weight: bold;">
+                ⏳ Processando voz via IA (Aguarde alguns segundos)...
+            </div>
+
+            <hr style="border-color: #333; margin: 15px 0;">
+            <h4 style="margin: 0 0 10px 0; color: #aaa;">🎤 Gravar Voz para RVC</h4>
+            <p style="font-size: 12px; color: #777; margin: 0 0 10px 0;">Grave sua voz diretamente pelo microfone e transforme com o RVC.</p>
+            <button id="btn-open-voice-record" style="width: 100%; padding: 10px; background: linear-gradient(135deg, #7b2ff7, #f107a3); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; transition: opacity 0.2s;">
+                🎙️ Abrir Gravador de Voz
+            </button>
         </div>
     </div>
 
+    <!-- =================== VOICE RECORD MODAL =================== -->
+    <div id="voice-record-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200000; align-items: center; justify-content: center; backdrop-filter: blur(6px);">
+        <div style="background: #141414; border: 1px solid #2a2a2a; border-radius: 16px; padding: 28px; width: 440px; max-width: 95vw; box-shadow: 0 30px 80px rgba(0,0,0,0.9); display: flex; flex-direction: column; gap: 18px; position: relative;">
+
+            <!-- Header -->
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <h3 style="margin: 0; color: #fff; font-size: 18px; display: flex; align-items: center; gap: 10px;">
+                    🎙️ RVC — Voz para Personagem
+                </h3>
+                <button id="btn-close-voice-modal" style="background: none; border: none; color: #888; font-size: 22px; cursor: pointer; line-height: 1; padding: 2px 6px; border-radius: 4px; transition: color 0.2s;">✖</button>
+            </div>
+
+            <!-- Tabs -->
+            <div style="display: flex; gap: 0; background: #0d0d0d; border-radius: 8px; padding: 4px; border: 1px solid #222;">
+                <button id="voice-tab-mic" class="voice-modal-tab voice-modal-tab-active" style="flex: 1; padding: 9px; border: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; transition: all 0.2s; background: linear-gradient(135deg,#7b2ff7,#f107a3); color: #fff;">
+                    🎙️ Microfone
+                </button>
+                <button id="voice-tab-upload" class="voice-modal-tab" style="flex: 1; padding: 9px; border: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; transition: all 0.2s; background: transparent; color: #777;">
+                    📂 Upload de Áudio
+                </button>
+            </div>
+
+            <!-- ===== TAB: MICROFONE ===== -->
+            <div id="voice-panel-mic">
+                <!-- Waveform Visualizer -->
+                <div style="background: #0a0a0a; border-radius: 10px; border: 1px solid #222; padding: 10px; position: relative; height: 80px; overflow: hidden; display: flex; align-items: center; justify-content: center; margin-bottom: 14px;">
+                    <canvas id="voice-record-waveform" style="width: 100%; height: 60px; display: block;"></canvas>
+                    <div id="voice-record-idle-text" style="position: absolute; color: #555; font-size: 13px; pointer-events: none;">Pressione gravar para iniciar...</div>
+                </div>
+
+                <!-- Timer & Status -->
+                <div style="display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 14px;">
+                    <div id="voice-record-indicator" style="width: 12px; height: 12px; border-radius: 50%; background: #444; transition: background 0.3s;"></div>
+                    <span id="voice-record-timer" style="font-size: 22px; font-weight: bold; color: #fff; font-variant-numeric: tabular-nums; font-family: monospace;">0:00</span>
+                    <span id="voice-record-status" style="font-size: 13px; color: #777;">Aguardando...</span>
+                </div>
+
+                <!-- Record Controls -->
+                <div style="display: flex; gap: 10px; margin-bottom: 6px;">
+                    <button id="btn-voice-start-rec" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
+                        ● Gravar
+                    </button>
+                    <button id="btn-voice-stop-rec" disabled style="flex: 1; padding: 12px; background: #444; color: #888; border: none; border-radius: 8px; cursor: not-allowed; font-weight: bold; font-size: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
+                        ■ Parar
+                    </button>
+                </div>
+
+                <!-- Raw Preview (mic) -->
+                <div id="voice-raw-preview-section" style="display: none; flex-direction: column; gap: 8px; background: #1a1a1a; border-radius: 8px; padding: 12px; border: 1px solid #2a2a2a; margin-top: 10px;">
+                    <div style="font-size: 12px; color: #aaa; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">📻 Preview da Gravação</div>
+                    <audio id="voice-raw-audio" controls style="width: 100%; height: 36px; outline: none;"></audio>
+                </div>
+            </div>
+
+            <!-- ===== TAB: UPLOAD DE ÁUDIO ===== -->
+            <div id="voice-panel-upload" style="display: none; flex-direction: column; gap: 12px;">
+                <!-- Drop zone -->
+                <label id="voice-upload-dropzone" for="voice-upload-file-input" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: #0d0d0d; border: 2px dashed #333; border-radius: 10px; padding: 28px 16px; cursor: pointer; transition: border-color 0.2s; text-align: center;">
+                    <span style="font-size: 36px;">📂</span>
+                    <span style="color: #aaa; font-size: 14px; font-weight: bold;">Clique ou arraste um arquivo de áudio</span>
+                    <span style="color: #555; font-size: 12px;">MP3, WAV, OGG, FLAC, M4A, WEBM...</span>
+                </label>
+                <input type="file" id="voice-upload-file-input" accept="audio/*" style="display: none;">
+
+                <!-- File selected info -->
+                <div id="voice-upload-file-info" style="display: none; background: #1a1a1a; border-radius: 8px; padding: 12px; border: 1px solid #2a2a2a; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 22px;">🎵</span>
+                        <div style="flex: 1; overflow: hidden;">
+                            <div id="voice-upload-filename" style="color: #fff; font-weight: bold; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
+                            <div id="voice-upload-filesize" style="color: #777; font-size: 11px; margin-top: 2px;"></div>
+                        </div>
+                        <button id="voice-upload-clear" title="Remover arquivo" style="background: none; border: none; color: #dc3545; font-size: 18px; cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: color 0.2s; line-height: 1;">✖</button>
+                    </div>
+                    <audio id="voice-upload-raw-audio" controls style="width: 100%; height: 36px; outline: none;"></audio>
+                </div>
+            </div>
+
+            <!-- ===== SHARED: RVC Processing ===== -->
+            <div id="voice-rvc-section" style="display: none; flex-direction: column; gap: 10px; border-top: 1px solid #222; padding-top: 14px;">
+                <div id="voice-rvc-loading" style="display: none; padding: 10px; background: #1a1a2e; border-radius: 8px; text-align: center; color: #a78bfa; font-size: 13px; font-weight: bold;">
+                    ⏳ Aplicando RVC... Aguarde...
+                </div>
+
+                <!-- RVC Preview Audio -->
+                <div id="voice-rvc-preview-section" style="display: none; flex-direction: column; gap: 8px; background: #1a1a1a; border-radius: 8px; padding: 12px; border: 1px solid #2a2a2a;">
+                    <div style="font-size: 12px; color: #a78bfa; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">✨ Preview com RVC</div>
+                    <audio id="voice-rvc-audio" controls style="width: 100%; height: 36px; outline: none;"></audio>
+                </div>
+
+                <!-- Action Buttons -->
+                <div style="display: flex; gap: 10px;">
+                    <button id="btn-voice-rvc-preview" style="flex: 1; padding: 11px; background: #1d4ed8; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; transition: all 0.2s;">
+                        🎧 Testar com RVC
+                    </button>
+                    <button id="btn-voice-rvc-live" style="flex: 1; padding: 11px; background: linear-gradient(135deg, #16a34a, #15803d); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; transition: all 0.2s;">
+                        🔴 Enviar p/ Live
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    <!-- =========================================================== -->
+
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
@@ -4796,6 +4931,539 @@
                 }
             });
         });
+        // ===========================================================
+
+        // ======================= RVC TTS LOGIC =======================
+        const rvcModelSelect = document.getElementById('rvc-model');
+        const rvcPitch = document.getElementById('rvc-pitch');
+        const rvcPitchLabel = document.getElementById('rvc-pitch-label');
+        const rvcLoading = document.getElementById('rvc-loading');
+        const btnRvcPreview = document.getElementById('btn-rvc-preview');
+        const btnRvcLive = document.getElementById('btn-rvc-live');
+
+        // Atualizar valor do Pitch na tela
+        rvcPitch.addEventListener('input', () => {
+            rvcPitchLabel.innerText = rvcPitch.value;
+        });
+
+        // Carregar vozes ao abrir
+        window.addEventListener('load', () => {
+            fetch('/api/voices')
+                .then(res => res.json())
+                .then(models => {
+                    rvcModelSelect.innerHTML = '';
+                    if (models.length === 0) {
+                        const opt = document.createElement('option');
+                        opt.value = '';
+                        opt.innerText = 'Nenhuma voz RVC encontrada (.pth)';
+                        rvcModelSelect.appendChild(opt);
+                        return;
+                    }
+                    models.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m;
+                        opt.innerText = m.replace('.pth', '');
+                        rvcModelSelect.appendChild(opt);
+                    });
+                })
+                .catch(e => console.error("Erro ao carregar vozes RVC", e));
+        });
+
+        function getCharacterData() {
+            return {
+                imageUrl: document.getElementById('tts-image-url').value,
+                subtitleColor: document.getElementById('tts-subtitle-color').value,
+                position: document.getElementById('tts-position').value,
+                customFlip: document.getElementById('tts-custom-flip').checked,
+                customX: parseFloat(document.getElementById('tts-canvas-char').style.left || 80),
+                customY: parseFloat(document.getElementById('tts-canvas-char').style.top || 80),
+                animation: document.getElementById('tts-animation').value
+            };
+        }
+
+        btnRvcPreview.addEventListener('click', async () => {
+            const text = document.getElementById('tts-text').value.trim();
+            const model = rvcModelSelect.value;
+            const pitch = parseInt(rvcPitch.value);
+            
+            if (!text || !model) {
+                alert('Preencha o texto e selecione um modelo de voz.');
+                return;
+            }
+
+            // UI feedback
+            btnRvcPreview.disabled = true;
+            btnRvcLive.disabled = true;
+            rvcLoading.style.display = 'block';
+
+            try {
+                const res = await fetch('/api/tts/preview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, model, pitch })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    const audio = new Audio(data.audioUrl + "?t=" + Date.now()); // cache buster
+                    audio.play();
+                } else {
+                    alert('Erro: ' + (data.error || 'Desconhecido'));
+                }
+            } catch(e) {
+                alert('Erro na requisição RVC Preview');
+            } finally {
+                btnRvcPreview.disabled = false;
+                btnRvcLive.disabled = false;
+                rvcLoading.style.display = 'none';
+            }
+        });
+
+        btnRvcLive.addEventListener('click', async () => {
+            const text = document.getElementById('tts-text').value.trim();
+            const model = rvcModelSelect.value;
+            const pitch = parseInt(rvcPitch.value);
+            
+            if (!text || !model) {
+                alert('Preencha o texto e selecione um modelo de voz.');
+                return;
+            }
+
+            btnRvcPreview.disabled = true;
+            btnRvcLive.disabled = true;
+            rvcLoading.style.display = 'block';
+
+            try {
+                const res = await fetch('/api/tts/live', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        text, 
+                        model, 
+                        pitch, 
+                        characterData: getCharacterData() 
+                    })
+                });
+                const data = await res.json();
+                
+                if (!data.success) {
+                    alert('Erro ao enviar para live: ' + (data.error || 'Desconhecido'));
+                }
+            } catch(e) {
+                alert('Erro na requisição RVC Live');
+            } finally {
+                btnRvcPreview.disabled = false;
+                btnRvcLive.disabled = false;
+                rvcLoading.style.display = 'none';
+            }
+        });
+        // ===========================================================
+
+        // =================== VOICE RECORD MODAL JS ===================
+        (function () {
+            // --- DOM References ---
+            const modal = document.getElementById('voice-record-modal');
+            const btnOpen = document.getElementById('btn-open-voice-record');
+            const btnClose = document.getElementById('btn-close-voice-modal');
+
+            // Tabs
+            const tabMicBtn = document.getElementById('voice-tab-mic');
+            const tabUploadBtn = document.getElementById('voice-tab-upload');
+            const panelMic = document.getElementById('voice-panel-mic');
+            const panelUpload = document.getElementById('voice-panel-upload');
+
+            // Mic tab elements
+            const btnStartRec = document.getElementById('btn-voice-start-rec');
+            const btnStopRec = document.getElementById('btn-voice-stop-rec');
+            const waveformCanvas = document.getElementById('voice-record-waveform');
+            const waveformCtx = waveformCanvas ? waveformCanvas.getContext('2d') : null;
+            const timerEl = document.getElementById('voice-record-timer');
+            const statusEl = document.getElementById('voice-record-status');
+            const indicator = document.getElementById('voice-record-indicator');
+            const idleText = document.getElementById('voice-record-idle-text');
+            const rawAudio = document.getElementById('voice-raw-audio');
+            const rawPreviewSection = document.getElementById('voice-raw-preview-section');
+
+            // Upload tab elements
+            const fileInput = document.getElementById('voice-upload-file-input');
+            const dropzone = document.getElementById('voice-upload-dropzone');
+            const fileInfo = document.getElementById('voice-upload-file-info');
+            const fileNameEl = document.getElementById('voice-upload-filename');
+            const fileSizeEl = document.getElementById('voice-upload-filesize');
+            const uploadClearBtn = document.getElementById('voice-upload-clear');
+            const uploadRawAudio = document.getElementById('voice-upload-raw-audio');
+
+            // Shared RVC elements
+            const rvcAudio = document.getElementById('voice-rvc-audio');
+            const rvcSection = document.getElementById('voice-rvc-section');
+            const rvcPreviewSection = document.getElementById('voice-rvc-preview-section');
+            const rvcLoadingEl = document.getElementById('voice-rvc-loading');
+            const btnRvcPreviewVoice = document.getElementById('btn-voice-rvc-preview');
+            const btnRvcLiveVoice = document.getElementById('btn-voice-rvc-live');
+
+            // --- State ---
+            let activeTab = 'mic';   // 'mic' | 'upload'
+            let mediaRecorder = null;
+            let audioChunks = [];
+            let recordedBlob = null;  // blob from mic
+            let uploadedFile = null;  // File from upload tab
+            let timerInterval = null;
+            let timerSeconds = 0;
+            let audioContext = null;
+            let analyser = null;
+            let animFrameId = null;
+            let micStream = null;
+
+            // --- Tab Switching ---
+            function switchTab(tab) {
+                activeTab = tab;
+                // Stop any ongoing recording when switching tabs
+                stopMicEverything();
+                resetRvcShared();
+
+                if (tab === 'mic') {
+                    tabMicBtn.style.background = 'linear-gradient(135deg,#7b2ff7,#f107a3)';
+                    tabMicBtn.style.color = '#fff';
+                    tabUploadBtn.style.background = 'transparent';
+                    tabUploadBtn.style.color = '#777';
+                    panelMic.style.display = 'block';
+                    panelUpload.style.display = 'none';
+                    // Show RVC section if there's already a recording
+                    if (recordedBlob) rvcSection.style.display = 'flex';
+                } else {
+                    tabUploadBtn.style.background = 'linear-gradient(135deg,#7b2ff7,#f107a3)';
+                    tabUploadBtn.style.color = '#fff';
+                    tabMicBtn.style.background = 'transparent';
+                    tabMicBtn.style.color = '#777';
+                    panelMic.style.display = 'none';
+                    panelUpload.style.display = 'flex';
+                    // Show RVC section if there's already a file
+                    if (uploadedFile) rvcSection.style.display = 'flex';
+                }
+            }
+
+            tabMicBtn.addEventListener('click', () => switchTab('mic'));
+            tabUploadBtn.addEventListener('click', () => switchTab('upload'));
+
+            // --- Helpers ---
+            function formatTime(s) {
+                const m = Math.floor(s / 60);
+                const sec = s % 60;
+                return `${m}:${sec.toString().padStart(2, '0')}`;
+            }
+
+            function setStatus(text, color = '#777') {
+                statusEl.textContent = text;
+                statusEl.style.color = color;
+            }
+
+            function formatBytes(bytes) {
+                if (bytes < 1024) return bytes + ' B';
+                if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                return (bytes / 1048576).toFixed(1) + ' MB';
+            }
+
+            function resetRvcShared() {
+                rvcSection.style.display = 'none';
+                rvcPreviewSection.style.display = 'none';
+                rvcLoadingEl.style.display = 'none';
+                rvcAudio.src = '';
+            }
+
+            function resetMicPanel() {
+                audioChunks = [];
+                recordedBlob = null;
+                timerSeconds = 0;
+                timerEl.textContent = '0:00';
+                setStatus('Aguardando...');
+                indicator.style.background = '#444';
+                rawPreviewSection.style.display = 'none';
+                rawAudio.src = '';
+                btnStartRec.disabled = false;
+                btnStartRec.style.background = '#dc3545';
+                btnStartRec.style.color = 'white';
+                btnStartRec.style.cursor = 'pointer';
+                btnStopRec.disabled = true;
+                btnStopRec.style.background = '#444';
+                btnStopRec.style.color = '#888';
+                btnStopRec.style.cursor = 'not-allowed';
+                idleText.style.display = 'block';
+                if (waveformCtx) waveformCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
+            }
+
+            function resetUploadPanel() {
+                uploadedFile = null;
+                fileInput.value = '';
+                fileInfo.style.display = 'none';
+                dropzone.style.display = 'flex';
+                uploadRawAudio.src = '';
+                dropzone.style.borderColor = '#333';
+            }
+
+            function resetModal() {
+                resetMicPanel();
+                resetUploadPanel();
+                resetRvcShared();
+                switchTab('mic');
+            }
+
+            // --- Open / Close ---
+            btnOpen.addEventListener('click', () => {
+                resetModal();
+                modal.style.display = 'flex';
+            });
+
+            function closeModal() {
+                stopMicEverything();
+                modal.style.display = 'none';
+            }
+            btnClose.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+            function stopMicEverything() {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+                clearInterval(timerInterval);
+                cancelAnimationFrame(animFrameId);
+                if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+                if (audioContext) { audioContext.close().catch(() => {}); audioContext = null; }
+                indicator.style.background = '#444';
+            }
+
+            // ============================================================
+            // MIC TAB: Waveform + Recording
+            // ============================================================
+            function drawWaveform() {
+                if (!analyser || !waveformCtx) return;
+                animFrameId = requestAnimationFrame(drawWaveform);
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                analyser.getByteTimeDomainData(dataArray);
+                const w = waveformCanvas.width;
+                const h = waveformCanvas.height;
+                waveformCtx.clearRect(0, 0, w, h);
+                const gradient = waveformCtx.createLinearGradient(0, 0, w, 0);
+                gradient.addColorStop(0, '#7b2ff7');
+                gradient.addColorStop(1, '#f107a3');
+                waveformCtx.lineWidth = 2.5;
+                waveformCtx.strokeStyle = gradient;
+                waveformCtx.beginPath();
+                const sliceWidth = w / bufferLength;
+                let x = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    const v = dataArray[i] / 128.0;
+                    const y = (v * h) / 2;
+                    if (i === 0) waveformCtx.moveTo(x, y);
+                    else waveformCtx.lineTo(x, y);
+                    x += sliceWidth;
+                }
+                waveformCtx.lineTo(w, h / 2);
+                waveformCtx.stroke();
+            }
+
+            function setupWaveformCanvas() {
+                const container = waveformCanvas.parentElement;
+                waveformCanvas.width = container.offsetWidth - 20;
+                waveformCanvas.height = 60;
+            }
+
+            btnStartRec.addEventListener('click', async () => {
+                try {
+                    audioChunks = [];
+                    recordedBlob = null;
+                    resetRvcShared();
+                    rawPreviewSection.style.display = 'none';
+
+                    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+
+                    audioContext = new AudioContext();
+                    const source = audioContext.createMediaStreamSource(micStream);
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 1024;
+                    source.connect(analyser);
+
+                    setupWaveformCanvas();
+                    idleText.style.display = 'none';
+                    drawWaveform();
+
+                    mediaRecorder = new MediaRecorder(micStream, { mimeType: 'audio/webm' });
+                    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+                    mediaRecorder.onstop = () => {
+                        recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        rawAudio.src = URL.createObjectURL(recordedBlob);
+                        rawPreviewSection.style.display = 'flex';
+                        rvcSection.style.display = 'flex';
+                        setStatus('Gravação concluída!', '#4ade80');
+                        indicator.style.background = '#4ade80';
+                        cancelAnimationFrame(animFrameId);
+                        idleText.style.display = 'none';
+                        if (waveformCtx) waveformCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
+                    };
+                    mediaRecorder.start();
+
+                    timerSeconds = 0;
+                    timerEl.textContent = formatTime(timerSeconds);
+                    clearInterval(timerInterval);
+                    timerInterval = setInterval(() => { timerSeconds++; timerEl.textContent = formatTime(timerSeconds); }, 1000);
+
+                    indicator.style.background = '#dc3545';
+                    setStatus('Gravando...', '#f87171');
+                    btnStartRec.disabled = true;
+                    btnStartRec.style.background = '#444';
+                    btnStartRec.style.color = '#888';
+                    btnStartRec.style.cursor = 'not-allowed';
+                    btnStopRec.disabled = false;
+                    btnStopRec.style.background = '#555';
+                    btnStopRec.style.color = '#fff';
+                    btnStopRec.style.cursor = 'pointer';
+                } catch (err) {
+                    console.error('Mic error:', err);
+                    alert('Não foi possível acessar o microfone. Verifique as permissões do navegador.');
+                }
+            });
+
+            btnStopRec.addEventListener('click', () => {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+                clearInterval(timerInterval);
+                cancelAnimationFrame(animFrameId);
+                if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+                if (audioContext) { audioContext.close().catch(() => {}); audioContext = null; }
+                btnStopRec.disabled = true;
+                btnStopRec.style.background = '#444';
+                btnStopRec.style.color = '#888';
+                btnStopRec.style.cursor = 'not-allowed';
+                btnStartRec.disabled = false;
+                btnStartRec.style.background = '#dc3545';
+                btnStartRec.style.color = 'white';
+                btnStartRec.style.cursor = 'pointer';
+            });
+
+            // ============================================================
+            // UPLOAD TAB: File Input + Drag & Drop
+            // ============================================================
+            function handleUploadedFile(file) {
+                if (!file || !file.type.startsWith('audio/')) {
+                    alert('Por favor, selecione um arquivo de áudio válido.');
+                    return;
+                }
+                uploadedFile = file;
+                fileNameEl.textContent = file.name;
+                fileSizeEl.textContent = formatBytes(file.size);
+                uploadRawAudio.src = URL.createObjectURL(file);
+                dropzone.style.display = 'none';
+                fileInfo.style.display = 'flex';
+                resetRvcShared();
+                rvcSection.style.display = 'flex';
+            }
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) handleUploadedFile(e.target.files[0]);
+            });
+
+            uploadClearBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                resetUploadPanel();
+                resetRvcShared();
+            });
+
+            // Drag and drop
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.style.borderColor = '#7b2ff7';
+            });
+            dropzone.addEventListener('dragleave', () => {
+                dropzone.style.borderColor = '#333';
+            });
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.style.borderColor = '#333';
+                const file = e.dataTransfer.files[0];
+                if (file) handleUploadedFile(file);
+            });
+
+            // ============================================================
+            // SHARED: Build FormData + RVC Actions
+            // ============================================================
+            function buildFormData() {
+                const model = rvcModelSelect.value;
+                const pitch = parseInt(rvcPitch.value);
+
+                if (activeTab === 'mic') {
+                    if (!recordedBlob) { alert('Nenhuma gravação disponível. Grave primeiro.'); return null; }
+                    if (!model) { alert('Selecione um modelo RVC no painel do Personagem.'); return null; }
+                    const fd = new FormData();
+                    fd.append('audio', recordedBlob, 'recording.webm');
+                    fd.append('model', model);
+                    fd.append('pitch', pitch);
+                    return fd;
+                } else {
+                    if (!uploadedFile) { alert('Nenhum arquivo selecionado. Faça o upload primeiro.'); return null; }
+                    if (!model) { alert('Selecione um modelo RVC no painel do Personagem.'); return null; }
+                    const fd = new FormData();
+                    fd.append('audio', uploadedFile, uploadedFile.name);
+                    fd.append('model', model);
+                    fd.append('pitch', pitch);
+                    return fd;
+                }
+            }
+
+            function setRvcButtons(disabled) {
+                btnRvcPreviewVoice.disabled = disabled;
+                btnRvcLiveVoice.disabled = disabled;
+                btnRvcPreviewVoice.style.opacity = disabled ? '0.5' : '1';
+                btnRvcLiveVoice.style.opacity = disabled ? '0.5' : '1';
+            }
+
+            btnRvcPreviewVoice.addEventListener('click', async () => {
+                const fd = buildFormData();
+                if (!fd) return;
+                setRvcButtons(true);
+                rvcLoadingEl.style.display = 'block';
+                rvcPreviewSection.style.display = 'none';
+                try {
+                    const res = await fetch('/api/tts/record-rvc-preview', { method: 'POST', body: fd });
+                    const data = await res.json();
+                    if (data.success) {
+                        rvcAudio.src = data.audioUrl + '?t=' + Date.now();
+                        rvcPreviewSection.style.display = 'flex';
+                        rvcAudio.play();
+                        if (activeTab === 'mic') setStatus('Preview RVC pronto!', '#a78bfa');
+                    } else {
+                        alert('Erro no RVC: ' + (data.error || 'Desconhecido'));
+                    }
+                } catch (e) {
+                    alert('Erro na requisição RVC Preview.');
+                    console.error(e);
+                } finally {
+                    rvcLoadingEl.style.display = 'none';
+                    setRvcButtons(false);
+                }
+            });
+
+            btnRvcLiveVoice.addEventListener('click', async () => {
+                const fd = buildFormData();
+                if (!fd) return;
+                const charData = getCharacterData();
+                fd.append('characterDataJson', JSON.stringify(charData));
+                setRvcButtons(true);
+                rvcLoadingEl.style.display = 'block';
+                try {
+                    const res = await fetch('/api/tts/record-rvc-live', { method: 'POST', body: fd });
+                    const data = await res.json();
+                    if (data.success) {
+                        if (activeTab === 'mic') setStatus('Enviado para a live! ✅', '#4ade80');
+                        setTimeout(() => { closeModal(); }, 1200);
+                    } else {
+                        alert('Erro ao enviar para live: ' + (data.error || 'Desconhecido'));
+                    }
+                } catch (e) {
+                    alert('Erro na requisição RVC Live.');
+                    console.error(e);
+                } finally {
+                    rvcLoadingEl.style.display = 'none';
+                    setRvcButtons(false);
+                }
+            });
+        })();
         // ===========================================================
     </script>
 </body>

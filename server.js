@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const { exec } = require('child_process');
 
 const app = express();
 const server = http.createServer(app);
@@ -466,6 +467,195 @@ app.post('/api/tts-reorder', (req, res) => {
         res.status(400).json({ error: 'Formato de orderIds inválido' });
     }
 });
+
+// ========================================================
+// IA TTS PIPELINE (RVC + Piper)
+// ========================================================
+app.get('/api/voices', (req, res) => {
+    try {
+        const rvcDir = path.join(__dirname, 'tts', 'modelos_rvc');
+        if (!fs.existsSync(rvcDir)) {
+            return res.json([]);
+        }
+        
+        const models = [];
+        const items = fs.readdirSync(rvcDir, { withFileTypes: true });
+        
+        for (const item of items) {
+            if (item.isFile() && item.name.endsWith('.pth')) {
+                models.push(item.name);
+            } else if (item.isDirectory()) {
+                const subDir = path.join(rvcDir, item.name);
+                const subItems = fs.readdirSync(subDir);
+                for (const subItem of subItems) {
+                    if (subItem.endsWith('.pth')) {
+                        models.push(`${item.name}/${subItem}`);
+                    }
+                }
+            }
+        }
+        res.json(models);
+    } catch(e) {
+        console.error('Erro ao ler modelos RVC:', e);
+        res.status(500).json({ error: 'Erro ao ler modelos' });
+    }
+});
+
+function generateRVCAudio(text, model, pitch) {
+    return new Promise((resolve, reject) => {
+        const timestamp = Date.now();
+        const piperOutPath = path.join(audioUploadsDir, `base_${timestamp}.wav`);
+        const rvcOutPath = path.join(audioUploadsDir, `rvc_${timestamp}.wav`);
+        
+        // Ensure text is safely escaped for echo
+        const safeText = text.replace(/"/g, '\\"').replace(/\$/g, '\\$');
+
+        // Comando 1: Piper
+        // path resolusion for piper:
+        const piperCmd = `echo "${safeText}" | ./tts/tts_env/bin/piper --model ./tts/modelos_piper/pt_BR-faber-medium.onnx --output_file "${piperOutPath}"`;
+        
+        exec(piperCmd, { cwd: __dirname }, (error, stdout, stderr) => {
+            if (error) {
+                console.error('Piper Error:', stderr);
+                return reject('Falha ao gerar voz base com Piper');
+            }
+
+            // Comando 2: RVC
+            // cd tts && source tts_env/bin/activate && python -m rvc_python cli -i teste_voz.wav -o voz_final.wav -mp "modelos_rvc/${voz_modelo}" -de cpu -pi ${pitch} -me rmvpe
+            const rvcCmd = `cd tts && source tts_env/bin/activate && python -m rvc_python cli -i "${piperOutPath}" -o "${rvcOutPath}" -mp "modelos_rvc/${model}" -de cpu -pi ${pitch} -me rmvpe`;
+            
+            // Note: source requires bash
+            exec(rvcCmd, { cwd: __dirname, shell: '/bin/bash' }, (error2, stdout2, stderr2) => {
+                // Remove intermediate file regardless of success
+                try { fs.unlinkSync(piperOutPath); } catch(e) {}
+                
+                if (error2) {
+                    console.error('RVC Error:', stderr2);
+                    return reject('Falha ao clonar voz com RVC');
+                }
+                
+                resolve(`/audio_uploads/rvc_${timestamp}.wav`);
+            });
+        });
+    });
+}
+
+app.post('/api/tts/preview', express.json(), async (req, res) => {
+    try {
+        const { text, model, pitch } = req.body;
+        if (!text || !model || pitch === undefined) return res.status(400).json({ error: 'Faltam parâmetros' });
+        
+        const audioUrl = await generateRVCAudio(text, model, pitch);
+        res.json({ success: true, audioUrl });
+    } catch(e) {
+        res.status(500).json({ error: e });
+    }
+});
+
+// ===================== RVC VOICE RECORDING =====================
+// Multer para gravações temporárias de microfone
+const recordingsDir = path.join(__dirname, 'public', 'audio_uploads');
+const recordingStorage = multer.diskStorage({
+    destination: function (req, file, cb) { cb(null, recordingsDir); },
+    filename: function (req, file, cb) {
+        cb(null, `rec_${Date.now()}.webm`);
+    }
+});
+const uploadRecording = multer({ storage: recordingStorage });
+
+function processAudioWithRVC(inputAudioPath, model, pitch) {
+    return new Promise((resolve, reject) => {
+        const timestamp = Date.now();
+        const rvcOutPath = path.join(audioUploadsDir, `rvc_rec_${timestamp}.wav`);
+        // Convert webm → wav first using ffmpeg, then run RVC
+        const convertCmd = `ffmpeg -y -i "${inputAudioPath}" "${inputAudioPath.replace('.webm', '.wav')}"`;
+        const wavInputPath = inputAudioPath.replace('.webm', '.wav');
+        exec(convertCmd, { cwd: __dirname }, (err, stdout, stderr) => {
+            if (err) {
+                console.error('FFmpeg convert error:', stderr);
+                return reject('Falha ao converter áudio gravado (precisa de ffmpeg instalado)');
+            }
+            const rvcCmd = `cd tts && source tts_env/bin/activate && python -m rvc_python cli -i "${wavInputPath}" -o "${rvcOutPath}" -mp "modelos_rvc/${model}" -de cpu -pi ${pitch} -me rmvpe`;
+            exec(rvcCmd, { cwd: __dirname, shell: '/bin/bash' }, (err2, stdout2, stderr2) => {
+                try { fs.unlinkSync(inputAudioPath); } catch(e) {}
+                try { fs.unlinkSync(wavInputPath); } catch(e) {}
+                if (err2) {
+                    console.error('RVC Error:', stderr2);
+                    return reject('Falha ao clonar voz com RVC');
+                }
+                resolve(`/audio_uploads/rvc_rec_${timestamp}.wav`);
+            });
+        });
+    });
+}
+
+// Preview: processa a gravação com RVC e retorna a URL do áudio
+app.post('/api/tts/record-rvc-preview', uploadRecording.single('audio'), async (req, res) => {
+    try {
+        const { model, pitch } = req.body;
+        if (!req.file || !model || pitch === undefined) return res.status(400).json({ error: 'Faltam parâmetros (áudio, modelo, pitch)' });
+        const audioUrl = await processAudioWithRVC(req.file.path, model, parseInt(pitch));
+        res.json({ success: true, audioUrl });
+    } catch(e) {
+        res.status(500).json({ error: e });
+    }
+});
+
+// Live: processa a gravação com RVC e emite para a overlay
+app.post('/api/tts/record-rvc-live', uploadRecording.single('audio'), async (req, res) => {
+    try {
+        const { model, pitch, characterDataJson } = req.body;
+        if (!req.file || !model || pitch === undefined || !characterDataJson) return res.status(400).json({ error: 'Faltam parâmetros' });
+        const characterData = JSON.parse(characterDataJson);
+        const audioUrl = await processAudioWithRVC(req.file.path, model, parseInt(pitch));
+        io.emit('character:speak', {
+            text: '',
+            imageUrl: characterData.imageUrl,
+            audioUrl: audioUrl,
+            subtitleColor: characterData.subtitleColor,
+            position: characterData.position,
+            customFlip: characterData.customFlip,
+            customX: characterData.customX,
+            customY: characterData.customY,
+            audioBehavior: 'simultaneous',
+            muteBrowserTts: true,
+            animation: characterData.animation || 'none'
+        });
+        res.json({ success: true });
+    } catch(e) {
+        res.status(500).json({ error: e });
+    }
+});
+// ===============================================================
+
+app.post('/api/tts/live', express.json(), async (req, res) => {
+    try {
+        const { text, model, pitch, characterData } = req.body;
+        if (!text || !model || pitch === undefined || !characterData) return res.status(400).json({ error: 'Faltam parâmetros' });
+        
+        const audioUrl = await generateRVCAudio(text, model, pitch);
+        
+        // Emite para a overlay como um TTS normal, mas com o áudio gerado
+        io.emit('character:speak', {
+            text: text,
+            imageUrl: characterData.imageUrl,
+            audioUrl: audioUrl,
+            subtitleColor: characterData.subtitleColor,
+            position: characterData.position,
+            customFlip: characterData.customFlip,
+            customX: characterData.customX,
+            customY: characterData.customY,
+            audioBehavior: 'simultaneous',
+            muteBrowserTts: true, // Silencia o robô do browser, exibe legenda, toca áudio IA
+            animation: characterData.animation || 'none'
+        });
+        
+        res.json({ success: true });
+    } catch(e) {
+        res.status(500).json({ error: e });
+    }
+});
+// ========================================================
 
 // Serve static files from 'public' folder
 app.use(express.static(path.join(__dirname, 'public')));
