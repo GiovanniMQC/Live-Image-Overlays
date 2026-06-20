@@ -1,0 +1,18 @@
+# =========================
+# Arquivos do Motor de TTS (Piper + RVC)
+# =========================
+
+# Ignora o ambiente virtual do Python (muito pesado e específico do seu PC)
+tts/tts_env/
+
+# Ignora os modelos de Inteligência Artificial (arquivos pesados de gigabytes)
+tts/modelos_piper/
+tts/modelos_rvc/
+*.onnx
+*.onnx.json
+*.pth
+*.index
+
+# Ignora os áudios gerados temporariamente na live
+*.wav
+*.mp3
