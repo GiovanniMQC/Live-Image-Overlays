@@ -23,15 +23,25 @@
         #interaction-overlay {
             display: none;
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.8);
+            top: 20px; left: 20px;
+            background: rgba(0, 0, 0, 0.85);
             color: white;
-            font-size: 32px;
+            font-size: 20px;
+            font-weight: bold;
+            padding: 15px 25px;
+            border-radius: 8px;
+            border: 2px solid #ffd700;
             font-family: Arial, sans-serif;
             z-index: 999999;
-            align-items: center;
-            justify-content: center;
             cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            animation: pulse-notice 2s infinite;
+        }
+
+        @keyframes pulse-notice {
+            0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
         }
 
         /* Solução para artefatos de renderização (tearing) no OBS/Chromium */
@@ -124,6 +134,35 @@
             transform: translateY(0);
             color: var(--tts-active-color, #ffd700);
         }
+
+        /* TTS Animations */
+        @keyframes tts-bounce {
+            0%, 100% { translate: 0 0; }
+            50% { translate: 0 -15px; }
+        }
+        @keyframes tts-shake {
+            0%, 100% { translate: 0 0; rotate: 0deg; }
+            25% { translate: -5px 0; rotate: -3deg; }
+            75% { translate: 5px 0; rotate: 3deg; }
+        }
+        @keyframes tts-float {
+            0%, 100% { translate: 0 0; }
+            50% { translate: 0 -10px; }
+        }
+        @keyframes tts-stretch {
+            0%, 100% { scale: 1 1; }
+            50% { scale: 1.15 0.9; }
+        }
+
+        .anim-bounce-infinite img { animation: tts-bounce 0.4s infinite; }
+        .anim-shake-infinite img { animation: tts-shake 0.15s infinite; }
+        .anim-float-infinite img { animation: tts-float 3s infinite ease-in-out; }
+        .anim-stretch-infinite img { animation: tts-stretch 0.3s infinite; }
+
+        .anim-bounce-sync img { animation: tts-bounce 0.2s ease-out; }
+        .anim-shake-sync img { animation: tts-shake 0.15s ease-in-out; }
+        .anim-float-sync img { animation: tts-float 0.4s ease-in-out; }
+        .anim-stretch-sync img { animation: tts-stretch 0.15s ease-out; }
     </style>
 </head>
 <body>
@@ -212,7 +251,10 @@
         });
 
         function playAudioWithState(data) {
-            if (data.volume !== undefined) globalAudio.volume = data.volume;
+            if (data.volume !== undefined) {
+                const mult = data.volumeMult !== undefined ? data.volumeMult : 1;
+                globalAudio.volume = Math.min(1, data.volume * mult);
+            }
             if (data.trimEnd) {
                 globalAudio.dataset.trimEnd = data.trimEnd;
             } else {
@@ -318,7 +360,8 @@
         });
 
         socket.on('audio:volume', (data) => {
-            globalAudio.volume = data.volume;
+            const mult = data.volumeMult !== undefined ? data.volumeMult : 1;
+            globalAudio.volume = Math.min(1, data.volume * mult);
         });
 
         socket.on('sync_state', (stateList) => {
@@ -665,12 +708,20 @@
                 ttsImg.style.transform = 'scaleX(1)';
             }
 
-            // Mostra personagem
-            ttsContainer.classList.add('show');
-
             const hasText = !!data.text;
             const hasAudio = !!data.audioUrl;
             const behavior = data.audioBehavior || 'simultaneous'; // simultaneous, audio_only, audio_before, audio_after
+
+            // Animação inicial
+            ttsContainer.className = 'tts-character-container'; // clear old classes
+            if (data.animation && data.animation !== 'none') {
+                if (!hasText) {
+                    ttsContainer.classList.add(`anim-${data.animation}-infinite`);
+                }
+            }
+
+            // Mostra personagem
+            ttsContainer.classList.add('show');
 
             const hideCharacter = () => {
                 ttsContainer.classList.remove('show');
@@ -712,6 +763,13 @@
 
                     if (spokenWordIndex !== -1 && spokenWordIndex !== currentWordIndex) {
                         currentWordIndex = spokenWordIndex;
+
+                        // Sincroniza a animação
+                        if (data.animation && data.animation !== 'none') {
+                            ttsContainer.classList.remove(`anim-${data.animation}-sync`);
+                            void ttsContainer.offsetWidth; // Force reflow
+                            ttsContainer.classList.add(`anim-${data.animation}-sync`);
+                        }
                         
                         const chunkStartIndex = Math.floor(spokenWordIndex / 3) * 3;
                         
@@ -773,6 +831,9 @@
                 };
                 currentTtsAudio.play().catch(e => {
                     console.error("Erro ao tocar áudio do TTS:", e);
+                    if (e.name === 'NotAllowedError') {
+                        document.getElementById('interaction-overlay').style.display = 'flex';
+                    }
                     currentTtsAudio = null;
                     if (onFinish) onFinish();
                 });

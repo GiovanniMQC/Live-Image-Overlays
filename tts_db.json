@@ -1,0 +1,16 @@
+[
+  {
+    "id": "tts-1781956918463s89cd8x",
+    "name": "Mario",
+    "imageUrl": "https://static.wikia.nocookie.net/mario/images/7/75/Mario.png/revision/latest/scale-to-width-down/1200?cb=20241120011831&path-prefix=pt-br",
+    "audioUrl": "/audio_uploads/Super%20Mario%20Bros.%20-%20Mushroom%20Sound%20Effect%20cut.mp3",
+    "subtitleColor": "#ffd700",
+    "position": "right",
+    "customFlip": false,
+    "customX": 80,
+    "customY": 80,
+    "audioBehavior": "audio_before",
+    "animation": "bounce",
+    "pinned": false
+  }
+]

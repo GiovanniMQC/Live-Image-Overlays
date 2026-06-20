@@ -1166,10 +1166,36 @@
                         style="padding: 10px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 14px; width: 100%; box-sizing: border-box;">
                 </div>
             </div>
+            <div class="input-group" style="margin-top: 5px;">
+                <label>Volume Individual (<span id="edit-audio-vol-label">100%</span>)</label>
+                <input type="range" id="edit-audio-volume" min="0" max="2" step="0.05" value="1"
+                    style="width: 100%; cursor: pointer;">
+            </div>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <button id="btn-save-audio"
                     style="flex: 1; padding: 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Salvar</button>
                 <button id="btn-cancel-audio"
+                    style="flex: 1; padding: 10px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tts-edit-modal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100000; align-items: center; justify-content: center;">
+        <div
+            style="background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #444; width: 300px; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);">
+            <h3
+                style="margin: 0; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                ✏️ Editar Personagem</h3>
+            <div class="input-group">
+                <label>Nome do Personagem</label>
+                <input type="text" id="edit-tts-name"
+                    style="padding: 10px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 14px;">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button id="btn-save-tts-edit"
+                    style="flex: 1; padding: 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Salvar</button>
+                <button id="btn-cancel-tts-edit"
                     style="flex: 1; padding: 10px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Cancelar</button>
             </div>
         </div>
@@ -1246,7 +1272,13 @@
             <h2>🗣️ Personagem (TTS)</h2>
             <button class="btn-close-soundpad" onclick="toggleTtsSidebar()">✖</button>
         </div>
-        <div class="soundpad-controls">
+        <div class="soundpad-controls" style="padding-bottom: 5px;">
+            <button id="btn-save-tts-preset" class="btn-upload" style="background: #28a745; margin-bottom: 5px;">💾 Salvar Personagem Atual</button>
+        </div>
+        <div class="soundpad-grid" id="tts-grid" style="margin-bottom: 10px; padding: 0 10px; max-height: 150px; overflow-y: auto;">
+            <!-- Personagens inseridos via JS -->
+        </div>
+        <div class="soundpad-controls" style="border-top: 1px solid #444; padding-top: 10px;">
             <div class="input-group">
                 <label>Imagem do Personagem (PNG)</label>
                 <input type="file" id="tts-image-file" accept="image/png,image/gif,image/webp,image/jpeg"
@@ -1304,6 +1336,17 @@
                     <option value="audio_only">Apenas Áudio</option>
                     <option value="audio_before">Áudio antes do Texto</option>
                     <option value="audio_after">Áudio depois do Texto</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Animação</label>
+                <select id="tts-animation"
+                    style="padding: 8px; background: #111; color: #fff; border: 1px solid #444; border-radius: 4px; outline: none; margin-bottom: 5px; cursor: pointer; width: 100%;">
+                    <option value="none">Nenhuma (Padrão)</option>
+                    <option value="bounce">Pular (Entusiasmo)</option>
+                    <option value="shake">Tremer (Grito / Raiva)</option>
+                    <option value="float">Flutuar (Suave)</option>
+                    <option value="stretch">Esticar (Horizontal)</option>
                 </select>
             </div>
             <div class="input-group">
@@ -1959,6 +2002,7 @@
 
 
         let currentAudioList = [];
+        let currentAudioVolumeMult = 1;
         let currentEditAudioId = null;
         let dragSrcEl = null;
 
@@ -2033,8 +2077,18 @@
             document.getElementById('edit-audio-name').value = audio.name || '';
             document.getElementById('edit-audio-trim-start').value = audio.trimStart !== undefined && audio.trimStart !== null ? audio.trimStart : '';
             document.getElementById('edit-audio-trim-end').value = audio.trimEnd !== undefined && audio.trimEnd !== null ? audio.trimEnd : '';
+            
+            const vol = audio.volume !== undefined ? audio.volume : 1;
+            document.getElementById('edit-audio-volume').value = vol;
+            document.getElementById('edit-audio-vol-label').innerText = Math.round(vol * 100) + '%';
+            
             document.getElementById('audio-edit-modal').style.display = 'flex';
         }
+
+        document.getElementById('edit-audio-volume').addEventListener('input', (e) => {
+            const vol = parseFloat(e.target.value);
+            document.getElementById('edit-audio-vol-label').innerText = Math.round(vol * 100) + '%';
+        });
 
         document.getElementById('btn-cancel-audio').addEventListener('click', () => {
             document.getElementById('audio-edit-modal').style.display = 'none';
@@ -2046,6 +2100,7 @@
             const newName = document.getElementById('edit-audio-name').value;
             const newTrimStart = document.getElementById('edit-audio-trim-start').value;
             const newTrimEnd = document.getElementById('edit-audio-trim-end').value;
+            const newVolume = parseFloat(document.getElementById('edit-audio-volume').value);
 
             fetch(`/api/audio-update/${currentEditAudioId}`, {
                 method: 'POST',
@@ -2054,7 +2109,8 @@
                     name: newName,
                     icon: newIcon,
                     trimStart: newTrimStart === '' ? null : Number(newTrimStart),
-                    trimEnd: newTrimEnd === '' ? null : Number(newTrimEnd)
+                    trimEnd: newTrimEnd === '' ? null : Number(newTrimEnd),
+                    volume: newVolume
                 })
             })
                 .then(res => res.json())
@@ -2066,6 +2122,7 @@
                             audio.icon = newIcon;
                             audio.trimStart = newTrimStart === '' ? null : Number(newTrimStart);
                             audio.trimEnd = newTrimEnd === '' ? null : Number(newTrimEnd);
+                            audio.volume = newVolume;
                         }
                         renderAudioGrid();
                     }
@@ -2110,7 +2167,8 @@
                 socket.emit('audio:play', {
                     url: audio.url,
                     currentTime: audio.trimStart || 0,
-                    trimEnd: audio.trimEnd || null
+                    trimEnd: audio.trimEnd || null,
+                    volumeMult: audio.volume !== undefined ? audio.volume : 1
                 });
             };
 
@@ -2260,7 +2318,7 @@
         audioVolume.addEventListener('input', () => {
             const vol = parseFloat(audioVolume.value);
             audioVolLabel.innerText = Math.round(vol * 100) + '%';
-            globalAudio.volume = vol;
+            globalAudio.volume = Math.min(1, vol * currentAudioVolumeMult);
             socket.emit('audio:volume', { volume: vol });
         });
 
@@ -2352,7 +2410,13 @@
         }
 
         function playAudioWithState(data) {
-            if (data.volume !== undefined) globalAudio.volume = data.volume;
+            if (data.volumeMult !== undefined) {
+                currentAudioVolumeMult = data.volumeMult;
+            }
+            if (data.volume !== undefined) {
+                const mult = data.volumeMult !== undefined ? data.volumeMult : 1;
+                globalAudio.volume = Math.min(1, data.volume * mult);
+            }
             if (data.trimEnd) {
                 globalAudio.dataset.trimEnd = data.trimEnd;
             } else {
@@ -2434,7 +2498,11 @@
         });
 
         socket.on('audio:volume', (data) => {
-            globalAudio.volume = data.volume;
+            if (data.volumeMult !== undefined) {
+                currentAudioVolumeMult = data.volumeMult;
+            }
+            const mult = data.volumeMult !== undefined ? data.volumeMult : 1;
+            globalAudio.volume = Math.min(1, data.volume * mult);
             audioVolume.value = data.volume;
             audioVolLabel.innerText = Math.round(data.volume * 100) + '%';
         });
@@ -4439,6 +4507,7 @@
                 position: position,
                 audioUrl: audioUrl,
                 audioBehavior: behavior,
+                animation: document.getElementById('tts-animation').value,
                 subtitleColor: ttsSubtitleColor.value,
                 customX: customX,
                 customY: customY,
@@ -4549,8 +4618,186 @@
             ttsContainer.classList.remove('show');
             if (ttsSubtitle) ttsSubtitle.innerHTML = '';
         });
-    </script>
+        // ======================= TTS PRESETS =======================
+        let currentTtsList = [];
+        let ttsEditingId = null;
 
+        function loadTtsList() {
+            fetch('/api/tts-list')
+                .then(res => res.json())
+                .then(list => {
+                    currentTtsList = list;
+                    renderTtsGrid();
+                })
+                .catch(e => console.error("Erro ao carregar presets tts:", e));
+        }
+
+        function createTtsButton(tts) {
+            const btnContainer = document.createElement('div');
+            btnContainer.className = 'sound-btn-container';
+            btnContainer.dataset.id = tts.id;
+
+            const btn = document.createElement('button');
+            btn.className = 'sound-btn';
+            btn.innerHTML = `<span style="font-size: 24px;">🤖</span><span>${tts.name}</span>`;
+            
+            btn.addEventListener('click', () => {
+                // Preencher campos
+                document.getElementById('tts-image-url').value = tts.imageUrl || '';
+                document.getElementById('tts-audio-url').value = tts.audioUrl || '';
+                document.getElementById('tts-subtitle-color').value = tts.subtitleColor || '#ffd700';
+                document.getElementById('tts-position').value = tts.position || 'right';
+                document.getElementById('tts-custom-flip').checked = !!tts.customFlip;
+                document.getElementById('tts-audio-behavior').value = tts.audioBehavior || 'simultaneous';
+                document.getElementById('tts-animation').value = tts.animation || 'none';
+                
+                // Disparar eventos para atualizar a UI (preview, custom canvas se custom)
+                document.getElementById('tts-image-url').dispatchEvent(new Event('input'));
+                document.getElementById('tts-position').dispatchEvent(new Event('change'));
+                
+                if (tts.customX !== undefined && tts.customY !== undefined) {
+                    // Update TTS custom coords
+                    const c = document.getElementById('tts-canvas');
+                    const char = document.getElementById('tts-canvas-char');
+                    if(c && char) {
+                        char.style.left = tts.customX + '%';
+                        char.style.top = tts.customY + '%';
+                        document.getElementById('tts-canvas-coords').innerText = `X: ${tts.customX.toFixed(1)}% Y: ${tts.customY.toFixed(1)}%`;
+                    }
+                }
+            });
+
+            const pinIcon = document.createElement('div');
+            pinIcon.className = 'sound-btn-pin';
+            pinIcon.innerHTML = tts.pinned ? '📌' : '';
+
+            const btnEdit = document.createElement('button');
+            btnEdit.className = 'btn-edit-audio';
+            btnEdit.innerHTML = '✏️';
+            btnEdit.addEventListener('click', (e) => {
+                e.stopPropagation();
+                ttsEditingId = tts.id;
+                document.getElementById('edit-tts-name').value = tts.name;
+                document.getElementById('tts-edit-modal').style.display = 'flex';
+            });
+
+            btn.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                fetch(`/api/tts-update/${tts.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pinned: !tts.pinned })
+                }).then(() => loadTtsList());
+            });
+
+            btnContainer.appendChild(pinIcon);
+            btnContainer.appendChild(btn);
+            btnContainer.appendChild(btnEdit);
+
+            return btnContainer;
+        }
+
+        function renderTtsGrid() {
+            const grid = document.getElementById('tts-grid');
+            if(grid) {
+                grid.innerHTML = '';
+                currentTtsList.forEach(tts => {
+                    grid.appendChild(createTtsButton(tts));
+                });
+            }
+        }
+
+        window.addEventListener('load', loadTtsList);
+
+        document.getElementById('btn-save-tts-preset').addEventListener('click', () => {
+            const name = prompt("Digite um nome para este personagem:");
+            if (!name) return;
+
+            let customX = 80.0;
+            let customY = 80.0;
+            const coordsText = document.getElementById('tts-canvas-coords').innerText;
+            const match = coordsText.match(/X: ([\d.]+)% Y: ([\d.]+)%/);
+            if (match) {
+                customX = parseFloat(match[1]);
+                customY = parseFloat(match[2]);
+            }
+
+            const data = {
+                name: name,
+                imageUrl: document.getElementById('tts-image-url').value,
+                audioUrl: document.getElementById('tts-audio-url').value,
+                subtitleColor: document.getElementById('tts-subtitle-color').value,
+                position: document.getElementById('tts-position').value,
+                customFlip: document.getElementById('tts-custom-flip').checked,
+                customX: customX,
+                customY: customY,
+                audioBehavior: document.getElementById('tts-audio-behavior').value,
+                animation: document.getElementById('tts-animation').value,
+                pinned: false
+            };
+
+            fetch('/api/tts-add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(() => loadTtsList());
+        });
+
+        document.getElementById('btn-save-tts-edit').addEventListener('click', () => {
+            if (!ttsEditingId) return;
+            const newName = document.getElementById('edit-tts-name').value;
+            fetch(`/api/tts-update/${ttsEditingId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newName })
+            }).then(() => {
+                document.getElementById('tts-edit-modal').style.display = 'none';
+                loadTtsList();
+            });
+        });
+
+        document.getElementById('btn-cancel-tts-edit').addEventListener('click', () => {
+            document.getElementById('tts-edit-modal').style.display = 'none';
+        });
+
+        const deleteTtsBtn = document.createElement('button');
+        deleteTtsBtn.style.cssText = "padding: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 10px;";
+        deleteTtsBtn.innerHTML = "🗑️ Excluir Personagem";
+        deleteTtsBtn.addEventListener('click', () => {
+            if (confirm("Deseja realmente excluir este personagem?")) {
+                fetch(`/api/tts-delete/${ttsEditingId}`, { method: 'POST' })
+                .then(() => {
+                    document.getElementById('tts-edit-modal').style.display = 'none';
+                    loadTtsList();
+                });
+            }
+        });
+        document.querySelector('#tts-edit-modal > div').appendChild(deleteTtsBtn);
+
+        window.addEventListener('load', () => {
+            new Sortable(document.getElementById('tts-grid'), {
+                animation: 150,
+                delay: 200,
+                delayOnTouchOnly: true,
+                ghostClass: 'sortable-ghost',
+                onEnd: function (evt) {
+                    const itemEl = evt.item;
+                    const newOrder = [];
+                    document.querySelectorAll('#tts-grid .sound-btn-container').forEach(el => {
+                        newOrder.push(el.dataset.id);
+                    });
+                    fetch('/api/tts-reorder', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ orderIds: newOrder })
+                    }).then(() => loadTtsList());
+                }
+            });
+        });
+        // ===========================================================
+    </script>
 </body>
 
 </html>

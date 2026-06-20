@@ -178,7 +178,7 @@ app.get('/api/audio-list', (req, res) => {
 // Atualizar propriedades de um áudio
 app.post('/api/audio-update/:id', (req, res) => {
     const id = req.params.id;
-    const { name, icon, pinned, trimStart, trimEnd } = req.body;
+    const { name, icon, pinned, trimStart, trimEnd, volume } = req.body;
     
     const audio = audioList.find(a => a.id === id);
     if (audio) {
@@ -187,6 +187,7 @@ app.post('/api/audio-update/:id', (req, res) => {
         if (pinned !== undefined) audio.pinned = pinned;
         if (trimStart !== undefined) audio.trimStart = trimStart;
         if (trimEnd !== undefined) audio.trimEnd = trimEnd;
+        if (volume !== undefined) audio.volume = volume;
         saveAudioDb();
         res.json({ success: true, audio });
     } else {
@@ -369,6 +370,103 @@ app.post('/api/media-add', (req, res) => {
     }
 });
 
+// ======================= TTS API =======================
+
+const ttsDbPath = path.join(__dirname, 'tts_db.json');
+let ttsList = [];
+
+function loadTtsDb() {
+    if (fs.existsSync(ttsDbPath)) {
+        try {
+            ttsList = JSON.parse(fs.readFileSync(ttsDbPath, 'utf8'));
+        } catch(e) {
+            ttsList = [];
+        }
+    } else {
+        ttsList = [];
+        saveTtsDb();
+    }
+}
+
+function saveTtsDb() {
+    fs.writeFileSync(ttsDbPath, JSON.stringify(ttsList, null, 2));
+}
+
+loadTtsDb();
+
+app.get('/api/tts-list', (req, res) => {
+    // Sort logic: pinned first, then preserve existing order
+    const pinned = ttsList.filter(t => t.pinned);
+    const unpinned = ttsList.filter(t => !t.pinned);
+    res.json([...pinned, ...unpinned]);
+});
+
+app.post('/api/tts-add', (req, res) => {
+    const { name, imageUrl, audioUrl, subtitleColor, position, customFlip, customX, customY, audioBehavior, pinned, animation } = req.body;
+    const newTts = {
+        id: 'tts-' + Date.now() + Math.random().toString(36).substring(2,9),
+        name: name || 'Novo Personagem',
+        imageUrl: imageUrl || '',
+        audioUrl: audioUrl || '',
+        subtitleColor: subtitleColor || '#ffd700',
+        position: position || 'right',
+        customFlip: customFlip || false,
+        customX: customX !== undefined ? customX : 80.0,
+        customY: customY !== undefined ? customY : 80.0,
+        audioBehavior: audioBehavior || 'simultaneous',
+        animation: animation || 'none',
+        pinned: pinned || false
+    };
+    ttsList.push(newTts);
+    saveTtsDb();
+    res.json({ success: true, tts: newTts });
+});
+
+app.post('/api/tts-update/:id', (req, res) => {
+    const id = req.params.id;
+    const tts = ttsList.find(t => t.id === id);
+    if (tts) {
+        Object.assign(tts, req.body);
+        saveTtsDb();
+        res.json({ success: true, tts });
+    } else {
+        res.status(404).json({ error: 'Personagem não encontrado' });
+    }
+});
+
+app.post('/api/tts-delete/:id', (req, res) => {
+    const id = req.params.id;
+    const index = ttsList.findIndex(t => t.id === id);
+    if (index !== -1) {
+        ttsList.splice(index, 1);
+        saveTtsDb();
+        res.json({ success: true });
+    } else {
+        res.status(404).json({ error: 'Personagem não encontrado' });
+    }
+});
+
+app.post('/api/tts-reorder', (req, res) => {
+    const { orderIds } = req.body;
+    if (Array.isArray(orderIds)) {
+        const newList = [];
+        orderIds.forEach(id => {
+            const tts = ttsList.find(t => t.id === id);
+            if (tts) newList.push(tts);
+        });
+        ttsList.forEach(tts => {
+            if (!newList.find(t => t.id === tts.id)) {
+                newList.push(tts);
+            }
+        });
+        ttsList = newList;
+        saveTtsDb();
+        res.json({ success: true });
+    } else {
+        res.status(400).json({ error: 'Formato de orderIds inválido' });
+    }
+});
+
 // Serve static files from 'public' folder
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -390,6 +488,7 @@ io.on('connection', (socket) => {
         audioState.url = data.url;
         audioState.playing = true;
         audioState.currentTime = data.currentTime || 0;
+        audioState.volumeMult = data.volumeMult !== undefined ? data.volumeMult : 1;
         // io.emit manda pra TODOS conectados, inclusive quem enviou. Como o admin tbm ouve o proprio áudio isso não tem problema e garante que chega na overlay.
         io.emit('audio:play', audioState);
     });
