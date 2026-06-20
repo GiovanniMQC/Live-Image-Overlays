@@ -76,7 +76,8 @@
     "url": "/audio_uploads/frog-laughing-meme.mp3",
     "pinned": false,
     "trimStart": 1.15,
-    "trimEnd": null
+    "trimEnd": null,
+    "volume": 0.8
   },
   {
     "id": "up-1781024144491zp0bo00",
@@ -134,41 +135,6 @@
     "name": "Super Mario Bros. - Mu...",
     "icon": "🎵",
     "url": "/audio_uploads/Super%20Mario%20Bros.%20-%20Mushroom%20Sound%20Effect%20cut.mp3",
-    "pinned": false
-  },
-  {
-    "id": "up-1781964822088g8sppcd",
-    "name": "rvc_1781964478323",
-    "icon": "🎵",
-    "url": "/audio_uploads/rvc_1781964478323.wav",
-    "pinned": false
-  },
-  {
-    "id": "up-1781964822088ndgyagp",
-    "name": "rvc_1781964531944",
-    "icon": "🎵",
-    "url": "/audio_uploads/rvc_1781964531944.wav",
-    "pinned": false
-  },
-  {
-    "id": "up-1781965433530a2ldo6z",
-    "name": "rvc_1781964942678",
-    "icon": "🎵",
-    "url": "/audio_uploads/rvc_1781964942678.wav",
-    "pinned": false
-  },
-  {
-    "id": "up-17819679481700znhcjt",
-    "name": "rvc_1781965824549",
-    "icon": "🎵",
-    "url": "/audio_uploads/rvc_1781965824549.wav",
-    "pinned": false
-  },
-  {
-    "id": "up-1781967948170245ew72",
-    "name": "rvc_1781965878570",
-    "icon": "🎵",
-    "url": "/audio_uploads/rvc_1781965878570.wav",
     "pinned": false
   },
   {
