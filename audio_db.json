@@ -84,7 +84,10 @@
     "name": "My ding ding dong",
     "icon": "🎵",
     "url": "/audio_uploads/Oh%20You%20Touch%20My%20Tralala%20(Meme%20Music)%20-%20Sound%20Effect%20for%20editing.mp3",
-    "pinned": false
+    "pinned": false,
+    "trimStart": null,
+    "trimEnd": null,
+    "volume": 1
   },
   {
     "id": "up-1781024303668bk52vzf",
@@ -129,13 +132,6 @@
     "name": "Tonc naruto",
     "icon": "🎌",
     "url": "/audio_uploads/Awkward%20Moment%20Anime%20Sound%20%20%20Sound%20Effect%20for%20editing.mp3",
-    "pinned": false
-  },
-  {
-    "id": "up-17819560647290rzyx5j",
-    "name": "Super Mario Bros. - Mu...",
-    "icon": "🎵",
-    "url": "/audio_uploads/Super%20Mario%20Bros.%20-%20Mushroom%20Sound%20Effect%20cut.mp3",
     "pinned": false
   }
 ]

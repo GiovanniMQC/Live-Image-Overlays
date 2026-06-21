@@ -37,6 +37,27 @@ Uma interface exclusiva para o streamer enviar seu retorno para os admins com la
 * **Node.js & WebSockets (Socket.io):** Para a comunicação bidirecional em tempo real, sincronizando cursores, posições e eventos do painel.
 * **WebRTC:** Para a transmissão de vídeo e áudio P2P de baixíssima latência entre o portal do streamer e os admins.
 * **Frontend Vanilla:** HTML5, CSS3 e JavaScript puro para manipulação de Canvas e elementos de mídia.
+* **Python/Flask (Microserviço RVC):** Servidor local que mantém o modelo de voz clonada em memória RAM, eliminando o delay de 10–15s por requisição.
+
+---
+
+## 🚀 Como Iniciar (com Clonagem de Voz IA)
+
+O pipeline de TTS com RVC requer dois processos rodando em paralelo.
+
+### Terminal 1 — Microserviço RVC (Flask)
+Ative o ambiente virtual Python e inicie o servidor de inferência:
+```bash
+cd tts && source tts_env/bin/activate && cd .. && python servidor_rvc.py
+```
+> O servidor sobe na porta `5050` e mantém o modelo RVC em memória. Só reinicia o carregamento se o modelo mudar.
+
+### Terminal 2 — Servidor Node.js
+```bash
+npm start
+```
+
+Acesse o painel em `http://localhost:3000/admin.html`.
 
 ---
 *Feito com ☕ e IA — focado em prototipagem rápida e aprendizado contínuo.*

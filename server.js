@@ -513,41 +513,86 @@ app.get('/api/voices', (req, res) => {
     }
 });
 
+function callRvcMicroservice(inputPath, outputPath, modelPath, pitch) {
+    return new Promise((resolve, reject) => {
+        const payload = JSON.stringify({
+            input_path: inputPath,
+            output_path: outputPath,
+            model_path: modelPath,
+            pitch: pitch
+        });
+
+        const options = {
+            hostname: 'localhost',
+            port: 5050,
+            path: '/converter',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload)
+            }
+        };
+
+        const req = http.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+                try {
+                    const json = JSON.parse(data);
+                    if (res.statusCode === 200) {
+                        console.log(`✅ RVC concluído em ${json.tempo_segundos}s`);
+                        resolve();
+                    } else {
+                        reject(`Erro do microserviço RVC: ${json.erro || data}`);
+                    }
+                } catch (e) {
+                    reject(`Resposta inválida do microserviço RVC: ${data}`);
+                }
+            });
+        });
+
+        req.on('error', (e) => {
+            if (e.code === 'ECONNREFUSED') {
+                reject('Microserviço RVC não está rodando. Inicie o servidor_rvc.py antes de usar esta função.');
+            } else {
+                reject(`Erro de conexão com o microserviço RVC: ${e.message}`);
+            }
+        });
+
+        req.write(payload);
+        req.end();
+    });
+}
+
 function generateRVCAudio(text, model, pitch) {
     return new Promise((resolve, reject) => {
         const timestamp = Date.now();
         const piperOutPath = path.join(__dirname, `temp_piper_${timestamp}.wav`);
         const rvcOutPath = path.join(rvcTempDir, `rvc_${timestamp}.wav`);
-        
+
         // Ensure text is safely escaped for echo
         const safeText = text.replace(/"/g, '\\"').replace(/\$/g, '\\$');
 
-        // Comando 1: Piper
-        // path resolusion for piper:
+        // Passo 1: Gerar voz base com Piper
         const piperCmd = `echo "${safeText}" | ./tts/tts_env/bin/piper --model ./tts/modelos_piper/pt_BR-faber-medium.onnx --output_file "${piperOutPath}"`;
-        
-        exec(piperCmd, { cwd: __dirname }, (error, stdout, stderr) => {
+
+        exec(piperCmd, { cwd: __dirname }, async (error, stdout, stderr) => {
             if (error) {
                 console.error('Piper Error:', stderr);
                 return reject('Falha ao gerar voz base com Piper');
             }
 
-            // Comando 2: RVC
-            // cd tts && source tts_env/bin/activate && python -m rvc_python cli -i teste_voz.wav -o voz_final.wav -mp "modelos_rvc/${voz_modelo}" -de cpu -pi ${pitch} -me rmvpe
-            const rvcCmd = `cd tts && source tts_env/bin/activate && python -m rvc_python cli -i "${piperOutPath}" -o "${rvcOutPath}" -mp "modelos_rvc/${model}" -de cpu -pi ${pitch} -me rmvpe`;
-            
-            // Note: source requires bash
-            exec(rvcCmd, { cwd: __dirname, shell: '/bin/bash' }, (error2, stdout2, stderr2) => {
-                // Remove intermediate file regardless of success
-                try { fs.unlinkSync(piperOutPath); } catch(e) {}
-                
-                if (error2) {
-                    console.error('RVC Error:', stderr2);
-                    return reject('Falha ao clonar voz com RVC');
-                }
-                
+            // Passo 2: Converter com RVC via microserviço (modelo em cache)
+            const modelPath = path.join(__dirname, 'tts', 'modelos_rvc', model);
+            try {
+                await callRvcMicroservice(piperOutPath, rvcOutPath, modelPath, pitch);
                 resolve(`/rvc_temp/rvc_${timestamp}.wav`);
-            });
+            } catch (err) {
+                reject(err);
+            } finally {
+                // Remove arquivo intermediário do Piper independente do resultado
+                try { fs.unlinkSync(piperOutPath); } catch(e) {}
+            }
         });
     });
 }
@@ -579,24 +624,28 @@ function processAudioWithRVC(inputAudioPath, model, pitch) {
     return new Promise((resolve, reject) => {
         const timestamp = Date.now();
         const rvcOutPath = path.join(rvcTempDir, `rvc_rec_${timestamp}.wav`);
-        // Convert webm → wav first using ffmpeg, then run RVC
-        const convertCmd = `ffmpeg -y -i "${inputAudioPath}" "${inputAudioPath.replace('.webm', '.wav')}"`;
         const wavInputPath = inputAudioPath.replace('.webm', '.wav');
-        exec(convertCmd, { cwd: __dirname }, (err, stdout, stderr) => {
+
+        // Passo 1: Converter webm → wav via ffmpeg
+        const convertCmd = `ffmpeg -y -i "${inputAudioPath}" "${wavInputPath}"`;
+        exec(convertCmd, { cwd: __dirname }, async (err, stdout, stderr) => {
             if (err) {
                 console.error('FFmpeg convert error:', stderr);
                 return reject('Falha ao converter áudio gravado (precisa de ffmpeg instalado)');
             }
-            const rvcCmd = `cd tts && source tts_env/bin/activate && python -m rvc_python cli -i "${wavInputPath}" -o "${rvcOutPath}" -mp "modelos_rvc/${model}" -de cpu -pi ${pitch} -me rmvpe`;
-            exec(rvcCmd, { cwd: __dirname, shell: '/bin/bash' }, (err2, stdout2, stderr2) => {
+
+            // Passo 2: Converter com RVC via microserviço (modelo em cache)
+            const modelPath = path.join(__dirname, 'tts', 'modelos_rvc', model);
+            try {
+                await callRvcMicroservice(wavInputPath, rvcOutPath, modelPath, pitch);
+                resolve(`/rvc_temp/rvc_rec_${timestamp}.wav`);
+            } catch (err2) {
+                reject(err2);
+            } finally {
+                // Remove arquivos temporários independente do resultado
                 try { fs.unlinkSync(inputAudioPath); } catch(e) {}
                 try { fs.unlinkSync(wavInputPath); } catch(e) {}
-                if (err2) {
-                    console.error('RVC Error:', stderr2);
-                    return reject('Falha ao clonar voz com RVC');
-                }
-                resolve(`/rvc_temp/rvc_rec_${timestamp}.wav`);
-            });
+            }
         });
     });
 }
