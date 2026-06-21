@@ -1802,6 +1802,18 @@
                 <label>Pitch: <span id="rvc-pitch-label">0</span></label>
                 <input type="range" id="rvc-pitch" min="-12" max="12" value="0">
             </div>
+            <div class="input-group">
+                <label style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Método F0</span>
+                    <span style="font-size: 10px; color: var(--text-muted);">velocidade ↔ qualidade</span>
+                </label>
+                <select id="rvc-method">
+                    <option value="pm">PM — Rápido (menor qualidade)</option>
+                    <option value="harvest">Harvest — Equilibrado</option>
+                    <option value="rmvpe" selected>RMVPE — Alta qualidade</option>
+                    <option value="crepe">CREPE — Máxima qualidade (lento)</option>
+                </select>
+            </div>
             <div style="display: flex; gap: 10px;">
                 <button id="btn-rvc-preview"
                     style="flex: 1; padding: 10px; background: var(--primary); color: white; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600; font-family: Inter, Arial, sans-serif; font-size: 13px; transition: all var(--transition-base);">🎧
@@ -5446,6 +5458,7 @@
         const rvcModelSelect = document.getElementById('rvc-model');
         const rvcPitch = document.getElementById('rvc-pitch');
         const rvcPitchLabel = document.getElementById('rvc-pitch-label');
+        const rvcMethod = document.getElementById('rvc-method');
         const rvcLoading = document.getElementById('rvc-loading');
         const btnRvcPreview = document.getElementById('btn-rvc-preview');
         const btnRvcLive = document.getElementById('btn-rvc-live');
@@ -5555,6 +5568,7 @@
             const text = document.getElementById('tts-text').value.trim();
             const model = rvcModelSelect.value;
             const pitch = parseInt(rvcPitch.value);
+            const method = rvcMethod.value;
 
             if (!text || !model) {
                 alert('Preencha o texto e selecione um modelo de voz.');
@@ -5570,7 +5584,7 @@
                 const res = await fetch('/api/tts/preview', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text, model, pitch })
+                    body: JSON.stringify({ text, model, pitch, method })
                 });
                 const data = await res.json();
 
@@ -5593,6 +5607,7 @@
             const text = document.getElementById('tts-text').value.trim();
             const model = rvcModelSelect.value;
             const pitch = parseInt(rvcPitch.value);
+            const method = rvcMethod.value;
 
             if (!text || !model) {
                 alert('Preencha o texto e selecione um modelo de voz.');
@@ -5611,6 +5626,7 @@
                         text,
                         model,
                         pitch,
+                        method,
                         characterData: getCharacterData()
                     })
                 });
@@ -5956,6 +5972,7 @@
             function buildFormData() {
                 const model = rvcModelSelect.value;
                 const pitch = parseInt(rvcPitch.value);
+                const method = rvcMethod.value;
 
                 if (activeTab === 'mic') {
                     if (!recordedBlob) { alert('Nenhuma gravação disponível. Grave primeiro.'); return null; }
@@ -5964,6 +5981,7 @@
                     fd.append('audio', recordedBlob, 'recording.webm');
                     fd.append('model', model);
                     fd.append('pitch', pitch);
+                    fd.append('method', method);
                     return fd;
                 } else {
                     if (!uploadedFile) { alert('Nenhum arquivo selecionado. Faça o upload primeiro.'); return null; }
@@ -5972,6 +5990,7 @@
                     fd.append('audio', uploadedFile, uploadedFile.name);
                     fd.append('model', model);
                     fd.append('pitch', pitch);
+                    fd.append('method', method);
                     return fd;
                 }
             }

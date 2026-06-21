@@ -17,6 +17,7 @@ def converter_audio():
     output_path = dados.get('output_path')
     model_path = dados.get('model_path')
     pitch = dados.get('pitch', 0)
+    method = dados.get('method', 'rmvpe')
 
     if not all([input_path, output_path, model_path]):
         return jsonify({"erro": "Faltam parâmetros"}), 400
@@ -30,7 +31,7 @@ def converter_audio():
     # infer_file() só aceita input_path e output_path
     rvc.set_params(
         f0up_key=pitch,
-        f0method="pm",
+        f0method=method,
         index_rate=0
     )
 

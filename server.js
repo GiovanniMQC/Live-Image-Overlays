@@ -513,13 +513,14 @@ app.get('/api/voices', (req, res) => {
     }
 });
 
-function callRvcMicroservice(inputPath, outputPath, modelPath, pitch) {
+function callRvcMicroservice(inputPath, outputPath, modelPath, pitch, method) {
     return new Promise((resolve, reject) => {
         const payload = JSON.stringify({
             input_path: inputPath,
             output_path: outputPath,
             model_path: modelPath,
-            pitch: pitch
+            pitch: pitch,
+            method: method || 'rmvpe'
         });
 
         const options = {
@@ -564,7 +565,7 @@ function callRvcMicroservice(inputPath, outputPath, modelPath, pitch) {
     });
 }
 
-function generateRVCAudio(text, model, pitch) {
+function generateRVCAudio(text, model, pitch, method) {
     return new Promise((resolve, reject) => {
         const timestamp = Date.now();
         const piperOutPath = path.join(__dirname, `temp_piper_${timestamp}.wav`);
@@ -585,7 +586,7 @@ function generateRVCAudio(text, model, pitch) {
             // Passo 2: Converter com RVC via microserviço (modelo em cache)
             const modelPath = path.join(__dirname, 'tts', 'modelos_rvc', model);
             try {
-                await callRvcMicroservice(piperOutPath, rvcOutPath, modelPath, pitch);
+                await callRvcMicroservice(piperOutPath, rvcOutPath, modelPath, pitch, method);
                 resolve(`/rvc_temp/rvc_${timestamp}.wav`);
             } catch (err) {
                 reject(err);
@@ -599,10 +600,10 @@ function generateRVCAudio(text, model, pitch) {
 
 app.post('/api/tts/preview', express.json(), async (req, res) => {
     try {
-        const { text, model, pitch } = req.body;
+        const { text, model, pitch, method } = req.body;
         if (!text || !model || pitch === undefined) return res.status(400).json({ error: 'Faltam parâmetros' });
         
-        const audioUrl = await generateRVCAudio(text, model, pitch);
+        const audioUrl = await generateRVCAudio(text, model, pitch, method);
         res.json({ success: true, audioUrl });
     } catch(e) {
         res.status(500).json({ error: e });
@@ -620,7 +621,7 @@ const recordingStorage = multer.diskStorage({
 });
 const uploadRecording = multer({ storage: recordingStorage });
 
-function processAudioWithRVC(inputAudioPath, model, pitch) {
+function processAudioWithRVC(inputAudioPath, model, pitch, method) {
     return new Promise((resolve, reject) => {
         const timestamp = Date.now();
         const rvcOutPath = path.join(rvcTempDir, `rvc_rec_${timestamp}.wav`);
@@ -637,7 +638,7 @@ function processAudioWithRVC(inputAudioPath, model, pitch) {
             // Passo 2: Converter com RVC via microserviço (modelo em cache)
             const modelPath = path.join(__dirname, 'tts', 'modelos_rvc', model);
             try {
-                await callRvcMicroservice(wavInputPath, rvcOutPath, modelPath, pitch);
+                await callRvcMicroservice(wavInputPath, rvcOutPath, modelPath, pitch, method);
                 resolve(`/rvc_temp/rvc_rec_${timestamp}.wav`);
             } catch (err2) {
                 reject(err2);
@@ -653,9 +654,9 @@ function processAudioWithRVC(inputAudioPath, model, pitch) {
 // Preview: processa a gravação com RVC e retorna a URL do áudio
 app.post('/api/tts/record-rvc-preview', uploadRecording.single('audio'), async (req, res) => {
     try {
-        const { model, pitch } = req.body;
+        const { model, pitch, method } = req.body;
         if (!req.file || !model || pitch === undefined) return res.status(400).json({ error: 'Faltam parâmetros (áudio, modelo, pitch)' });
-        const audioUrl = await processAudioWithRVC(req.file.path, model, parseInt(pitch));
+        const audioUrl = await processAudioWithRVC(req.file.path, model, parseInt(pitch), method);
         res.json({ success: true, audioUrl });
     } catch(e) {
         res.status(500).json({ error: e });
@@ -665,10 +666,10 @@ app.post('/api/tts/record-rvc-preview', uploadRecording.single('audio'), async (
 // Live: processa a gravação com RVC e emite para a overlay
 app.post('/api/tts/record-rvc-live', uploadRecording.single('audio'), async (req, res) => {
     try {
-        const { model, pitch, characterDataJson } = req.body;
+        const { model, pitch, method, characterDataJson } = req.body;
         if (!req.file || !model || pitch === undefined || !characterDataJson) return res.status(400).json({ error: 'Faltam parâmetros' });
         const characterData = JSON.parse(characterDataJson);
-        const audioUrl = await processAudioWithRVC(req.file.path, model, parseInt(pitch));
+        const audioUrl = await processAudioWithRVC(req.file.path, model, parseInt(pitch), method);
         io.emit('character:speak', {
             text: '',
             imageUrl: characterData.imageUrl,
@@ -711,10 +712,10 @@ app.get('/api/rvc-history', (req, res) => {
 
 app.post('/api/tts/live', express.json(), async (req, res) => {
     try {
-        const { text, model, pitch, characterData } = req.body;
+        const { text, model, pitch, method, characterData } = req.body;
         if (!text || !model || pitch === undefined || !characterData) return res.status(400).json({ error: 'Faltam parâmetros' });
         
-        const audioUrl = await generateRVCAudio(text, model, pitch);
+        const audioUrl = await generateRVCAudio(text, model, pitch, method);
         
         // Emite para a overlay como um TTS normal, mas com o áudio gerado
         io.emit('character:speak', {
