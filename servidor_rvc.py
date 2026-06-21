@@ -35,6 +35,7 @@ def converter_audio():
         index_rate=0
     )
 
+    print(f"▶ Inferindo | método: {method} | pitch: {pitch:+d} | saída: {output_path}")
     start_time = time.time()
 
     try:
@@ -42,7 +43,9 @@ def converter_audio():
             input_path=input_path,
             output_path=output_path
         )
-        return jsonify({"status": "sucesso", "tempo_segundos": round(time.time() - start_time, 2)}), 200
+        elapsed = round(time.time() - start_time, 2)
+        print(f"✅ Concluído em {elapsed}s")
+        return jsonify({"status": "sucesso", "tempo_segundos": elapsed}), 200
 
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
