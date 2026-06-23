@@ -3194,6 +3194,17 @@
             }
         });
 
+        // Bloqueia o comportamento nativo de "Primary Selection Paste" do Linux/X11
+        // ao clicar com o botão do meio. O capture:true garante que este handler
+        // intercepta o evento antes de qualquer outro listener, mas NÃO chama
+        // stopPropagation — o listener de panning do workspace ainda funciona normalmente.
+        document.addEventListener('mousedown', (e) => {
+            if (e.button === 1) e.preventDefault();
+        }, { capture: true });
+        document.addEventListener('auxclick', (e) => {
+            if (e.button === 1) e.preventDefault();
+        }, { capture: true });
+
         // Configurações do layout virtual
         const obsWidth = 1920;
         const obsHeight = 1080;
@@ -3728,17 +3739,19 @@
             // Ignora atalho se estiver digitando num input
             if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
 
-            // Calcula o centro da tela atual visível baseando-se no tamanho da janela
-            const rect = virtualCanvas.getBoundingClientRect();
-            const centerX = (window.innerWidth / 2 - rect.left) / currentScale;
-            const centerY = (window.innerHeight / 2 - rect.top) / currentScale;
+            // Cola no meio da área de bastidores (à esquerda do OBS),
+            // bem longe da borda para que nenhum conteúdo apareça na live.
+            // canvasPadding=4000 → OBS começa em x=0 (canvas x=4000).
+            // Spawn em canvas x=2000 → OBS x=-2000 (2000px fora da tela).
+            const spawnX = canvasPadding / 2;
+            const spawnY = canvasPadding / 2;
 
             if (e.clipboardData.files && e.clipboardData.files.length > 0) {
-                handleFileUpload(e.clipboardData.files[0], centerX, centerY);
+                handleFileUpload(e.clipboardData.files[0], spawnX, spawnY);
             } else {
                 let url = extractUrlFromData(e.clipboardData);
                 if (url && (url.startsWith('http') || url.startsWith('data:') || url.startsWith('/uploads/'))) {
-                    createMediaFromUrl(url, centerX, centerY);
+                    createMediaFromUrl(url, spawnX, spawnY);
                 }
             }
         });
