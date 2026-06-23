@@ -4274,6 +4274,12 @@
                     document.activeElement.blur();
                 }
 
+                // Se for botão do meio ou Segurando Espaço + Click Esquerdo,
+                // ignora o arrasto da mídia para permitir que o workspace mova a tela.
+                if (e.button === 1 || (e.button === 0 && isSpacePressed)) {
+                    return;
+                }
+
                 // Encontra todas as mídias (draggables) exatamente embaixo de onde o mouse clicou
                 const elementsUnderMouse = document.elementsFromPoint(e.clientX, e.clientY)
                     .map(el => el.closest('.draggable'))
