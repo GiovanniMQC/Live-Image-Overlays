@@ -16,3 +16,36 @@ tts/modelos_rvc/
 # Ignora os áudios gerados temporariamente na live
 *.wav
 *.mp3
+
+# =========================
+# Bancos de Dados (estado local da aplicação)
+# =========================
+audio_db.json
+media_db.json
+tts_db.json
+
+# =========================
+# Mídia Customizada (uploads do usuário)
+# =========================
+
+# Imagens e vídeos enviados pelo painel admin
+public/uploads/
+
+# Áudios enviados pelo soundpad
+public/audio_uploads/
+
+# Áudios temporários gerados pelo pipeline RVC/TTS
+public/rvc_temp/
+
+# =========================
+# Logs de execução
+# =========================
+.logs/
+
+# =========================
+# Sistema / Editores
+# =========================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

@@ -3766,6 +3766,9 @@
         workspace.addEventListener('wheel', (e) => {
             if (!navModeSelect) return; // Segurança contra falhas
 
+            // Se estiver fazendo pan (botão do meio ou Espaço), bloqueia o scroll da roda completamente.
+            if (isPanning) { e.preventDefault(); return; }
+
             const draggable = e.target.closest('.draggable');
             const isMouseMode = navModeSelect.value === 'mouse';
 
