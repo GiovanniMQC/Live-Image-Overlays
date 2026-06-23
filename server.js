@@ -415,7 +415,7 @@ app.get('/api/tts-list', (req, res) => {
 });
 
 app.post('/api/tts-add', (req, res) => {
-    const { name, imageUrl, audioUrl, subtitleColor, position, customFlip, customX, customY, audioBehavior, pinned, animation } = req.body;
+    const { name, imageUrl, audioUrl, subtitleColor, position, customFlip, customX, customY, audioBehavior, pinned, animation, rvcModel, rvcPitch, rvcMethod } = req.body;
     const newTts = {
         id: 'tts-' + Date.now() + Math.random().toString(36).substring(2,9),
         name: name || 'Novo Personagem',
@@ -428,7 +428,10 @@ app.post('/api/tts-add', (req, res) => {
         customY: customY !== undefined ? customY : 80.0,
         audioBehavior: audioBehavior || 'simultaneous',
         animation: animation || 'none',
-        pinned: pinned || false
+        pinned: pinned || false,
+        rvcModel: rvcModel || '',
+        rvcPitch: rvcPitch !== undefined ? rvcPitch : 0,
+        rvcMethod: rvcMethod || 'rmvpe'
     };
     ttsList.push(newTts);
     saveTtsDb();

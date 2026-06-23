@@ -5306,6 +5306,12 @@
                 document.getElementById('tts-custom-flip').checked = !!tts.customFlip;
                 document.getElementById('tts-audio-behavior').value = tts.audioBehavior || 'simultaneous';
                 document.getElementById('tts-animation').value = tts.animation || 'none';
+                if (tts.rvcModel) document.getElementById('rvc-model').value = tts.rvcModel;
+                if (tts.rvcPitch !== undefined) {
+                    document.getElementById('rvc-pitch').value = tts.rvcPitch;
+                    document.getElementById('rvc-pitch-label').innerText = tts.rvcPitch;
+                }
+                if (tts.rvcMethod) document.getElementById('rvc-method').value = tts.rvcMethod;
 
                 // Disparar eventos para atualizar a UI (preview, custom canvas se custom)
                 document.getElementById('tts-image-url').dispatchEvent(new Event('input'));
@@ -5389,7 +5395,10 @@
                 customY: customY,
                 audioBehavior: document.getElementById('tts-audio-behavior').value,
                 animation: document.getElementById('tts-animation').value,
-                pinned: false
+                pinned: false,
+                rvcModel: document.getElementById('rvc-model').value,
+                rvcPitch: parseInt(document.getElementById('rvc-pitch').value) || 0,
+                rvcMethod: document.getElementById('rvc-method').value
             };
 
             fetch('/api/tts-add', {
