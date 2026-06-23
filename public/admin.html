@@ -1814,8 +1814,8 @@
                 </label>
                 <select id="rvc-method">
                     <option value="pm">PM — Rápido (menor qualidade)</option>
-                    <option value="harvest">Harvest — Equilibrado</option>
-                    <option value="rmvpe" selected>RMVPE — Alta qualidade</option>
+                    <option value="harvest" selected>Harvest — Equilibrado</option>
+                    <option value="rmvpe">RMVPE — Alta qualidade</option>
                     <option value="crepe">CREPE — Máxima qualidade (lento)</option>
                 </select>
             </div>
@@ -5520,26 +5520,12 @@
                     if (models.length === 0) {
                         const opt = document.createElement('option');
                         opt.value = '';
-                        opt.innerText = 'Nenhuma voz encontrada (.pth ou .onnx)';
+                        opt.innerText = 'Nenhuma voz encontrada (.onnx)';
                         rvcModelSelect.appendChild(opt);
                         return;
                     }
 
-                    const pthModels = models.filter(m => m.type === 'pth');
                     const onnxModels = models.filter(m => m.type === 'onnx');
-
-                    if (pthModels.length > 0) {
-                        const group = document.createElement('optgroup');
-                        group.label = '🎙️ RVC Classic (PTH)';
-                        pthModels.forEach(m => {
-                            const opt = document.createElement('option');
-                            opt.value = m.name;
-                            opt.dataset.type = 'pth';
-                            opt.innerText = m.label;
-                            group.appendChild(opt);
-                        });
-                        rvcModelSelect.appendChild(group);
-                    }
 
                     if (onnxModels.length > 0) {
                         const group = document.createElement('optgroup');
@@ -5565,30 +5551,23 @@
 
         function getSelectedModelType() {
             const selected = rvcModelSelect.options[rvcModelSelect.selectedIndex];
-            return selected ? (selected.dataset.type || 'pth') : 'pth';
+            return selected ? (selected.dataset.type || 'onnx') : 'onnx';
         }
 
         function updateRvcEngineUI() {
-            const type = getSelectedModelType();
             const badge = document.getElementById('rvc-engine-badge');
             const methodSelect = document.getElementById('rvc-method');
 
-            if (type === 'onnx') {
-                badge.style.display = 'inline-block';
-                // Desabilita métodos não suportados pelo ONNX
-                Array.from(methodSelect.options).forEach(opt => {
-                    const unsupported = ['rmvpe', 'crepe'];
-                    opt.disabled = unsupported.includes(opt.value);
-                    if (opt.disabled && opt.selected) {
-                        // Volta para PM automaticamente
-                        methodSelect.value = 'pm';
-                    }
-                });
-            } else {
-                badge.style.display = 'none';
-                // Reabilita todos os métodos para PTH
-                Array.from(methodSelect.options).forEach(opt => { opt.disabled = false; });
-            }
+            badge.style.display = 'inline-block';
+            // Desabilita métodos não suportados pelo ONNX
+            Array.from(methodSelect.options).forEach(opt => {
+                const unsupported = ['rmvpe', 'crepe'];
+                opt.disabled = unsupported.includes(opt.value);
+                if (opt.disabled && opt.selected) {
+                    // Volta para harvest automaticamente
+                    methodSelect.value = 'harvest';
+                }
+            });
         }
 
         rvcModelSelect.addEventListener('change', updateRvcEngineUI);

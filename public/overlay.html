@@ -182,6 +182,17 @@
         const mediaState = {};
         let globalAudio = new Audio();
 
+        function safeUrl(url) {
+            if (!url) return '';
+            try {
+                const u = new URL(url);
+                if (u.hostname === 'localhost' || u.hostname.startsWith('192.168.') || u.hostname.startsWith('10.') || u.hostname === '127.0.0.1') {
+                    return u.pathname + u.search;
+                }
+            } catch(e) { }
+            return url;
+        }
+
         function applyTransform(id) {
             const media = mediaState[id];
             const container = mediaElements[id];
@@ -277,8 +288,8 @@
             };
             
             if (data.url) {
-                const fullUrl = new URL(data.url, window.location.origin).href;
-                if (globalAudio.src !== fullUrl) {
+                const fullUrl = safeUrl(data.url);
+                if (globalAudio.src !== new URL(fullUrl, window.location.origin).href) {
                     globalAudio.pause();
                     globalAudio.src = data.url;
                     globalAudio.load();
@@ -318,9 +329,9 @@
                 playAudioWithState(data);
             } else {
                 if (data.url) {
-                    const fullUrl = new URL(data.url, window.location.origin).href;
-                    if (globalAudio.src !== fullUrl) {
-                        globalAudio.src = data.url;
+                    const fullUrl = safeUrl(data.url);
+                    if (globalAudio.src !== new URL(fullUrl, window.location.origin).href) {
+                        globalAudio.src = fullUrl;
                         globalAudio.load();
                     }
                 }
@@ -646,7 +657,7 @@
 
             // Atualiza imagem — converte para URL absoluta para funcionar em acesso remoto (Tailscale, etc)
             if (data.imageUrl) {
-                ttsImg.src = new URL(data.imageUrl, window.location.origin).href;
+                ttsImg.src = safeUrl(data.imageUrl);
             } else {
                 ttsImg.src = "https://cdn-icons-png.flaticon.com/512/4712/4712010.png";
             }
@@ -731,8 +742,7 @@
             // Não usa speechSynthesis — incompatível com WebViews (IRL PRO, OBS, etc).
             const speakVoice = (onFinish) => {
                 if (data.rvcAudioUrl) {
-                    const absoluteRvcUrl = new URL(data.rvcAudioUrl, window.location.origin).href;
-                    currentRvcAudio = new Audio(absoluteRvcUrl);
+                    currentRvcAudio = new Audio(safeUrl(data.rvcAudioUrl));
                     currentRvcAudio.onended = () => {
                         currentRvcAudio = null;
                         if (onFinish) onFinish();
@@ -761,8 +771,7 @@
                     if (onFinish) onFinish();
                     return;
                 }
-                const absoluteAudioUrl = new URL(data.audioUrl, window.location.origin).href;
-                currentTtsAudio = new Audio(absoluteAudioUrl);
+                currentTtsAudio = new Audio(safeUrl(data.audioUrl));
                 currentTtsAudio.onended = () => {
                     currentTtsAudio = null;
                     if (onFinish) onFinish();

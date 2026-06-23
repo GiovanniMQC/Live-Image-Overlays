@@ -490,25 +490,7 @@ app.get('/api/voices', (req, res) => {
     try {
         const models = [];
 
-        // --- Modelos PTH (rvc_python) ---
-        const rvcDir = path.join(__dirname, 'tts', 'modelos_rvc');
-        if (fs.existsSync(rvcDir)) {
-            const items = fs.readdirSync(rvcDir, { withFileTypes: true });
-            for (const item of items) {
-                if (item.isFile() && item.name.endsWith('.pth')) {
-                    models.push({ name: item.name, type: 'pth', label: item.name.replace('.pth', '') });
-                } else if (item.isDirectory()) {
-                    const subDir = path.join(rvcDir, item.name);
-                    const subItems = fs.readdirSync(subDir);
-                    for (const subItem of subItems) {
-                        if (subItem.endsWith('.pth')) {
-                            const relativeName = `${item.name}/${subItem}`;
-                            models.push({ name: relativeName, type: 'pth', label: relativeName.replace('.pth', '') });
-                        }
-                    }
-                }
-            }
-        }
+        // (Modelos PTH desativados por enquanto)
 
         // --- Modelos ONNX (OnnxRVC) ---
         const onnxDir = path.join(__dirname, 'tts', 'modelos_onnx');

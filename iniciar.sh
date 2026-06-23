@@ -60,12 +60,12 @@ trap cleanup SIGINT SIGTERM
 # -----------------------------------------------------------
 # 1. Servidor RVC (rvc_python — porta 5050)
 # -----------------------------------------------------------
-echo -e "${BOLD}[1/3]${RESET} Iniciando ${GREEN}RVC${RESET} (porta 5050)..."
-"$PYTHON" "$PROJECT_DIR/servidor_rvc.py" \
-    > "$LOG_DIR/rvc.log" 2>&1 &
-PID_RVC=$!
-PIDS+=("$PID_RVC")
-echo -e "      PID: ${CYAN}$PID_RVC${RESET} | Log: ${YELLOW}.logs/rvc.log${RESET}"
+echo -e "${BOLD}[1/3]${RESET} ${YELLOW}RVC (PTH) desativado para economizar RAM${RESET}..."
+# "$PYTHON" "$PROJECT_DIR/servidor_rvc.py" \
+#     > "$LOG_DIR/rvc.log" 2>&1 &
+# PID_RVC=$!
+# PIDS+=("$PID_RVC")
+# echo -e "      PID: ${CYAN}$PID_RVC${RESET} | Log: ${YELLOW}.logs/rvc.log${RESET}"
 
 # -----------------------------------------------------------
 # 2. Servidor RVC-ONNX (porta 5051)

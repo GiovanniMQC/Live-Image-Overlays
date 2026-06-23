@@ -3,6 +3,8 @@ import sys
 import time
 import numpy as np
 import soundfile
+import gc
+import threading
 from flask import Flask, request, jsonify
 
 # Adiciona a pasta RVC_Onnx_Infer ao path para importar os módulos
@@ -22,6 +24,24 @@ VEC_NAME = "vec-768-layer-12"
 modelo_atual_path = None
 modelo_onnx = None
 modelo_sr = None  # Sample rate real do modelo, detectado na carga
+last_used_time = time.time()
+CACHE_TIMEOUT = 60  # Segundos de inatividade antes de descarregar da memória
+
+def memory_manager():
+    """Thread em background para limpar a memória se ociuoso"""
+    global modelo_onnx, modelo_atual_path, modelo_sr
+    while True:
+        time.time()
+        if modelo_onnx is not None and (time.time() - last_used_time > CACHE_TIMEOUT):
+            print("🧹 Descarregando modelo ONNX da memória por inatividade para liberar RAM...")
+            del modelo_onnx
+            modelo_onnx = None
+            modelo_atual_path = None
+            gc.collect()
+        time.sleep(5)
+
+# Inicia a thread de gerenciamento de memória
+threading.Thread(target=memory_manager, daemon=True).start()
 
 
 def detectar_sr_do_modelo(model_path):
@@ -62,7 +82,9 @@ def detectar_sr_do_modelo(model_path):
 
 def carregar_modelo(model_path):
     """Carrega o modelo ONNX e mantém em cache."""
-    global modelo_atual_path, modelo_onnx, modelo_sr
+    global modelo_atual_path, modelo_onnx, modelo_sr, last_used_time
+
+    last_used_time = time.time()
 
     if model_path == modelo_atual_path and modelo_onnx is not None:
         return  # Modelo já em cache
@@ -134,6 +156,13 @@ def converter_audio():
         soundfile.write(output_path, audio, modelo_sr)
     except Exception as e:
         return jsonify({"erro": f"Falha ao salvar áudio: {e}"}), 500
+
+    global last_used_time
+    last_used_time = time.time()
+    
+    # Limpa vestígios da inferência para não usar swap
+    del audio
+    gc.collect()
 
     return jsonify({"status": "sucesso", "tempo_segundos": elapsed}), 200
 
