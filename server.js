@@ -485,27 +485,48 @@ app.post('/api/tts-reorder', (req, res) => {
 // ========================================================
 app.get('/api/voices', (req, res) => {
     try {
-        const rvcDir = path.join(__dirname, 'tts', 'modelos_rvc');
-        if (!fs.existsSync(rvcDir)) {
-            return res.json([]);
-        }
-        
         const models = [];
-        const items = fs.readdirSync(rvcDir, { withFileTypes: true });
-        
-        for (const item of items) {
-            if (item.isFile() && item.name.endsWith('.pth')) {
-                models.push(item.name);
-            } else if (item.isDirectory()) {
-                const subDir = path.join(rvcDir, item.name);
-                const subItems = fs.readdirSync(subDir);
-                for (const subItem of subItems) {
-                    if (subItem.endsWith('.pth')) {
-                        models.push(`${item.name}/${subItem}`);
+
+        // --- Modelos PTH (rvc_python) ---
+        const rvcDir = path.join(__dirname, 'tts', 'modelos_rvc');
+        if (fs.existsSync(rvcDir)) {
+            const items = fs.readdirSync(rvcDir, { withFileTypes: true });
+            for (const item of items) {
+                if (item.isFile() && item.name.endsWith('.pth')) {
+                    models.push({ name: item.name, type: 'pth', label: item.name.replace('.pth', '') });
+                } else if (item.isDirectory()) {
+                    const subDir = path.join(rvcDir, item.name);
+                    const subItems = fs.readdirSync(subDir);
+                    for (const subItem of subItems) {
+                        if (subItem.endsWith('.pth')) {
+                            const relativeName = `${item.name}/${subItem}`;
+                            models.push({ name: relativeName, type: 'pth', label: relativeName.replace('.pth', '') });
+                        }
                     }
                 }
             }
         }
+
+        // --- Modelos ONNX (OnnxRVC) ---
+        const onnxDir = path.join(__dirname, 'tts', 'modelos_onnx');
+        if (fs.existsSync(onnxDir)) {
+            const items = fs.readdirSync(onnxDir, { withFileTypes: true });
+            for (const item of items) {
+                if (item.isFile() && item.name.endsWith('.onnx')) {
+                    models.push({ name: item.name, type: 'onnx', label: item.name.replace('.onnx', '') });
+                } else if (item.isDirectory()) {
+                    const subDir = path.join(onnxDir, item.name);
+                    const subItems = fs.readdirSync(subDir);
+                    for (const subItem of subItems) {
+                        if (subItem.endsWith('.onnx')) {
+                            const relativeName = `${item.name}/${subItem}`;
+                            models.push({ name: relativeName, type: 'onnx', label: relativeName.replace('.onnx', '') });
+                        }
+                    }
+                }
+            }
+        }
+
         res.json(models);
     } catch(e) {
         console.error('Erro ao ler modelos RVC:', e);
@@ -541,7 +562,7 @@ function callRvcMicroservice(inputPath, outputPath, modelPath, pitch, method) {
                 try {
                     const json = JSON.parse(data);
                     if (res.statusCode === 200) {
-                        console.log(`✅ RVC concluído em ${json.tempo_segundos}s`);
+                        console.log(`✅ RVC (PTH) concluído em ${json.tempo_segundos}s`);
                         resolve();
                     } else {
                         reject(`Erro do microserviço RVC: ${json.erro || data}`);
@@ -554,7 +575,7 @@ function callRvcMicroservice(inputPath, outputPath, modelPath, pitch, method) {
 
         req.on('error', (e) => {
             if (e.code === 'ECONNREFUSED') {
-                reject('Microserviço RVC não está rodando. Inicie o servidor_rvc.py antes de usar esta função.');
+                reject('Microserviço RVC (PTH) não está rodando. Inicie o servidor_rvc.py antes de usar esta função.');
             } else {
                 reject(`Erro de conexão com o microserviço RVC: ${e.message}`);
             }
@@ -565,7 +586,59 @@ function callRvcMicroservice(inputPath, outputPath, modelPath, pitch, method) {
     });
 }
 
-function generateRVCAudio(text, model, pitch, method) {
+function callOnnxMicroservice(inputPath, outputPath, modelPath, pitch, method) {
+    return new Promise((resolve, reject) => {
+        const payload = JSON.stringify({
+            input_path: inputPath,
+            output_path: outputPath,
+            model_path: modelPath,
+            pitch: pitch,
+            method: method || 'pm'
+        });
+
+        const options = {
+            hostname: 'localhost',
+            port: 5051,
+            path: '/converter',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload)
+            }
+        };
+
+        const req = http.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+                try {
+                    const json = JSON.parse(data);
+                    if (res.statusCode === 200) {
+                        console.log(`✅ RVC (ONNX) concluído em ${json.tempo_segundos}s`);
+                        resolve();
+                    } else {
+                        reject(`Erro do microserviço ONNX: ${json.erro || data}`);
+                    }
+                } catch (e) {
+                    reject(`Resposta inválida do microserviço ONNX: ${data}`);
+                }
+            });
+        });
+
+        req.on('error', (e) => {
+            if (e.code === 'ECONNREFUSED') {
+                reject('Microserviço RVC-ONNX não está rodando. Inicie o servidor_rvc_onnx.py antes de usar esta função.');
+            } else {
+                reject(`Erro de conexão com o microserviço ONNX: ${e.message}`);
+            }
+        });
+
+        req.write(payload);
+        req.end();
+    });
+}
+
+function generateRVCAudio(text, model, modelType, pitch, method) {
     return new Promise((resolve, reject) => {
         const timestamp = Date.now();
         const piperOutPath = path.join(__dirname, `temp_piper_${timestamp}.wav`);
@@ -583,10 +656,16 @@ function generateRVCAudio(text, model, pitch, method) {
                 return reject('Falha ao gerar voz base com Piper');
             }
 
-            // Passo 2: Converter com RVC via microserviço (modelo em cache)
-            const modelPath = path.join(__dirname, 'tts', 'modelos_rvc', model);
+            // Passo 2: Converter com o microserviço correto baseado no tipo de modelo
+            const isOnnx = modelType === 'onnx';
+            const modelsDir = isOnnx ? 'modelos_onnx' : 'modelos_rvc';
+            const modelPath = path.join(__dirname, 'tts', modelsDir, model);
             try {
-                await callRvcMicroservice(piperOutPath, rvcOutPath, modelPath, pitch, method);
+                if (isOnnx) {
+                    await callOnnxMicroservice(piperOutPath, rvcOutPath, modelPath, pitch, method);
+                } else {
+                    await callRvcMicroservice(piperOutPath, rvcOutPath, modelPath, pitch, method);
+                }
                 resolve(`/rvc_temp/rvc_${timestamp}.wav`);
             } catch (err) {
                 reject(err);
@@ -600,10 +679,10 @@ function generateRVCAudio(text, model, pitch, method) {
 
 app.post('/api/tts/preview', express.json(), async (req, res) => {
     try {
-        const { text, model, pitch, method } = req.body;
+        const { text, model, modelType, pitch, method } = req.body;
         if (!text || !model || pitch === undefined) return res.status(400).json({ error: 'Faltam parâmetros' });
         
-        const audioUrl = await generateRVCAudio(text, model, pitch, method);
+        const audioUrl = await generateRVCAudio(text, model, modelType || 'pth', pitch, method);
         res.json({ success: true, audioUrl });
     } catch(e) {
         res.status(500).json({ error: e });
@@ -621,7 +700,7 @@ const recordingStorage = multer.diskStorage({
 });
 const uploadRecording = multer({ storage: recordingStorage });
 
-function processAudioWithRVC(inputAudioPath, model, pitch, method) {
+function processAudioWithRVC(inputAudioPath, model, modelType, pitch, method) {
     return new Promise((resolve, reject) => {
         const timestamp = Date.now();
         const rvcOutPath = path.join(rvcTempDir, `rvc_rec_${timestamp}.wav`);
@@ -635,10 +714,16 @@ function processAudioWithRVC(inputAudioPath, model, pitch, method) {
                 return reject('Falha ao converter áudio gravado (precisa de ffmpeg instalado)');
             }
 
-            // Passo 2: Converter com RVC via microserviço (modelo em cache)
-            const modelPath = path.join(__dirname, 'tts', 'modelos_rvc', model);
+            // Passo 2: Converter com o microserviço correto baseado no tipo de modelo
+            const isOnnx = modelType === 'onnx';
+            const modelsDir = isOnnx ? 'modelos_onnx' : 'modelos_rvc';
+            const modelPath = path.join(__dirname, 'tts', modelsDir, model);
             try {
-                await callRvcMicroservice(wavInputPath, rvcOutPath, modelPath, pitch, method);
+                if (isOnnx) {
+                    await callOnnxMicroservice(wavInputPath, rvcOutPath, modelPath, pitch, method);
+                } else {
+                    await callRvcMicroservice(wavInputPath, rvcOutPath, modelPath, pitch, method);
+                }
                 resolve(`/rvc_temp/rvc_rec_${timestamp}.wav`);
             } catch (err2) {
                 reject(err2);
@@ -654,9 +739,9 @@ function processAudioWithRVC(inputAudioPath, model, pitch, method) {
 // Preview: processa a gravação com RVC e retorna a URL do áudio
 app.post('/api/tts/record-rvc-preview', uploadRecording.single('audio'), async (req, res) => {
     try {
-        const { model, pitch, method } = req.body;
+        const { model, modelType, pitch, method } = req.body;
         if (!req.file || !model || pitch === undefined) return res.status(400).json({ error: 'Faltam parâmetros (áudio, modelo, pitch)' });
-        const audioUrl = await processAudioWithRVC(req.file.path, model, parseInt(pitch), method);
+        const audioUrl = await processAudioWithRVC(req.file.path, model, modelType || 'pth', parseInt(pitch), method);
         res.json({ success: true, audioUrl });
     } catch(e) {
         res.status(500).json({ error: e });
@@ -666,10 +751,10 @@ app.post('/api/tts/record-rvc-preview', uploadRecording.single('audio'), async (
 // Live: processa a gravação com RVC e emite para a overlay
 app.post('/api/tts/record-rvc-live', uploadRecording.single('audio'), async (req, res) => {
     try {
-        const { model, pitch, method, characterDataJson } = req.body;
+        const { model, modelType, pitch, method, characterDataJson } = req.body;
         if (!req.file || !model || pitch === undefined || !characterDataJson) return res.status(400).json({ error: 'Faltam parâmetros' });
         const characterData = JSON.parse(characterDataJson);
-        const audioUrl = await processAudioWithRVC(req.file.path, model, parseInt(pitch), method);
+        const audioUrl = await processAudioWithRVC(req.file.path, model, modelType || 'pth', parseInt(pitch), method);
         io.emit('character:speak', {
             text: '',
             imageUrl: characterData.imageUrl,
@@ -712,10 +797,10 @@ app.get('/api/rvc-history', (req, res) => {
 
 app.post('/api/tts/live', express.json(), async (req, res) => {
     try {
-        const { text, model, pitch, method, characterData } = req.body;
+        const { text, model, modelType, pitch, method, characterData } = req.body;
         if (!text || !model || pitch === undefined || !characterData) return res.status(400).json({ error: 'Faltam parâmetros' });
         
-        const audioUrl = await generateRVCAudio(text, model, pitch, method);
+        const audioUrl = await generateRVCAudio(text, model, modelType || 'pth', pitch, method);
         
         // Emite para a overlay como um TTS normal, mas com o áudio gerado
         io.emit('character:speak', {
