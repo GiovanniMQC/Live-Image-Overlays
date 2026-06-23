@@ -3520,6 +3520,7 @@
             const isBackgroundClick = e.target === workspace || e.target === virtualCanvas || e.target === canvasWrapper || e.target.id === 'obs-bounds';
 
             if (isPanIntent) {
+                // Pan da tela — funciona sobre qualquer alvo (fundo ou cima de mídia)
                 isPanning = true;
                 workspace.style.cursor = 'grabbing';
                 panStartX = e.clientX;
@@ -3528,25 +3529,24 @@
                 scrollStartY = workspace.scrollTop;
                 e.preventDefault();
 
-                // Não limpa a seleção ao apenas mover a tela, é uma UX melhor.
                 if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
                     document.activeElement.blur();
                 }
-            } else if (isBackgroundClick && e.button === 0) { // Left click normal para Marquee no fundo
+            } else if (isBackgroundClick && e.button === 0) {
+                // Seleção por marquee — só no clique esquerdo sobre o fundo
                 isMarquee = true;
                 if (!e.shiftKey) clearSelection();
                 const rect = canvasWrapper.getBoundingClientRect();
                 marqueeStartX = (e.clientX - rect.left) / currentScale;
                 marqueeStartY = (e.clientY - rect.top) / currentScale;
                 marqueeBox.style.display = 'block';
-                    marqueeBox.style.left = marqueeStartX + 'px';
-                    marqueeBox.style.top = marqueeStartY + 'px';
-                    marqueeBox.style.width = '0px';
-                    marqueeBox.style.height = '0px';
+                marqueeBox.style.left = marqueeStartX + 'px';
+                marqueeBox.style.top = marqueeStartY + 'px';
+                marqueeBox.style.width = '0px';
+                marqueeBox.style.height = '0px';
 
-                    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
-                        document.activeElement.blur();
-                    }
+                if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
+                    document.activeElement.blur();
                 }
             }
         });
