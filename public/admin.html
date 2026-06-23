@@ -3516,28 +3516,29 @@
         const marqueeBox = document.getElementById('marquee-box');
 
         workspace.addEventListener('mousedown', (e) => {
-            if (e.target === workspace || e.target === virtualCanvas || e.target === canvasWrapper || e.target.id === 'obs-bounds') {
-                if (e.button === 1 || (e.button === 0 && isSpacePressed)) { // Middle click ou Space + Left click
-                    isPanning = true;
-                    workspace.style.cursor = 'grabbing';
-                    panStartX = e.clientX;
-                    panStartY = e.clientY;
-                    scrollStartX = workspace.scrollLeft;
-                    scrollStartY = workspace.scrollTop;
-                    e.preventDefault();
+            const isPanIntent = e.button === 1 || (e.button === 0 && isSpacePressed);
+            const isBackgroundClick = e.target === workspace || e.target === virtualCanvas || e.target === canvasWrapper || e.target.id === 'obs-bounds';
 
-                    clearSelection();
+            if (isPanIntent) {
+                isPanning = true;
+                workspace.style.cursor = 'grabbing';
+                panStartX = e.clientX;
+                panStartY = e.clientY;
+                scrollStartX = workspace.scrollLeft;
+                scrollStartY = workspace.scrollTop;
+                e.preventDefault();
 
-                    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
-                        document.activeElement.blur();
-                    }
-                } else if (e.button === 0) { // Left click normal para Marquee
-                    isMarquee = true;
-                    if (!e.shiftKey) clearSelection();
-                    const rect = canvasWrapper.getBoundingClientRect();
-                    marqueeStartX = (e.clientX - rect.left) / currentScale;
-                    marqueeStartY = (e.clientY - rect.top) / currentScale;
-                    marqueeBox.style.display = 'block';
+                // Não limpa a seleção ao apenas mover a tela, é uma UX melhor.
+                if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
+                    document.activeElement.blur();
+                }
+            } else if (isBackgroundClick && e.button === 0) { // Left click normal para Marquee no fundo
+                isMarquee = true;
+                if (!e.shiftKey) clearSelection();
+                const rect = canvasWrapper.getBoundingClientRect();
+                marqueeStartX = (e.clientX - rect.left) / currentScale;
+                marqueeStartY = (e.clientY - rect.top) / currentScale;
+                marqueeBox.style.display = 'block';
                     marqueeBox.style.left = marqueeStartX + 'px';
                     marqueeBox.style.top = marqueeStartY + 'px';
                     marqueeBox.style.width = '0px';
