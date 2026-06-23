@@ -14,7 +14,7 @@
     "pinned": false
   },
   {
-    "id": "tts-1782209001036r6tj5f4",
+    "id": "tts-1782210677266qqfqr0t",
     "name": "Jovi",
     "imageUrl": "/uploads/jovirobo.png?v=1782122975133",
     "audioUrl": "",
@@ -25,10 +25,13 @@
     "customY": 80,
     "audioBehavior": "audio_before",
     "animation": "bounce",
-    "pinned": false
+    "pinned": false,
+    "rvcModel": "Jovi.onnx",
+    "rvcPitch": 0,
+    "rvcMethod": "harvest"
   },
   {
-    "id": "tts-17822090264450brnwjp",
+    "id": "tts-17822107061416d2qsu9",
     "name": "Dava",
     "imageUrl": "/uploads/firefox_Z18DyCU5Jd.png?v=1782123459416",
     "audioUrl": "",
@@ -39,6 +42,9 @@
     "customY": 80,
     "audioBehavior": "audio_before",
     "animation": "bounce",
-    "pinned": false
+    "pinned": false,
+    "rvcModel": "DavyJones.onnx",
+    "rvcPitch": 0,
+    "rvcMethod": "harvest"
   }
 ]
