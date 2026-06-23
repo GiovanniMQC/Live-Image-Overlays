@@ -777,6 +777,30 @@ app.post('/api/tts/record-rvc-live', uploadRecording.single('audio'), async (req
         res.status(500).json({ error: e });
     }
 });
+
+// Emite para a overlay um áudio RVC já gerado (sem reprocessar)
+app.post('/api/tts/emit-rvc', express.json(), (req, res) => {
+    try {
+        const { rvcAudioUrl, characterData } = req.body;
+        if (!rvcAudioUrl || !characterData) return res.status(400).json({ error: 'Faltam parâmetros' });
+        io.emit('character:speak', {
+            text: '',
+            imageUrl: characterData.imageUrl,
+            audioUrl: characterData.audioUrl,
+            audioBehavior: characterData.audioBehavior,
+            rvcAudioUrl: rvcAudioUrl,
+            subtitleColor: characterData.subtitleColor,
+            position: characterData.position,
+            customFlip: characterData.customFlip,
+            customX: characterData.customX,
+            customY: characterData.customY,
+            animation: characterData.animation || 'none'
+        });
+        res.json({ success: true });
+    } catch(e) {
+        res.status(500).json({ error: e });
+    }
+});
 // ===============================================================
 
 app.get('/api/rvc-history', (req, res) => {
