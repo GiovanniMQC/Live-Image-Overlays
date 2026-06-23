@@ -1447,14 +1447,16 @@
             <div id="panel-help" class="tool-panel">
                 <h3>❓ Atalhos e Ajuda</h3>
                 <div style="font-size: 13px; color: #ccc; line-height: 1.8;">
-                    <span id="help-scroll-text">🖱️ <b>Scroll:</b> Zoom<br>🖱️ <b>Espaço + Arrastar:</b> Mover
-                        Tela</span><br>
+                    <span id="help-scroll-text">🖱️ <b>Scroll:</b> Zoom Canvas<br>
+                    🖱️ <b>Botão do Meio ou Espaço + Arrastar:</b> Mover Tela</span><br>
+                    ⌨️ <b>Ctrl + Scroll:</b> Redimensionar Mídia<br>
                     ⌨️ <b>Shift + Scroll:</b> Esticar na Horizontal<br>
                     ⌨️ <b>Alt + Scroll:</b> Esticar na Vertical<br>
+                    ⌨️ <b>Ctrl + V:</b> Colar Mídia (Imagem, Vídeo, Áudio, URL)<br>
+                    ⌨️ <b>Ctrl + D:</b> Duplicar Selecionada<br>
                     ⌨️ <b>Delete:</b> Apagar Selecionada<br>
                     ⌨️ <b>F:</b> Tela Cheia (Selecionada)<br>
-                    ⌨️ <b>H:</b> Ocultar (Selecionada)<br>
-                    🖐️ <b>Arrastar Fundo:</b> Mover Canvas
+                    ⌨️ <b>H:</b> Ocultar/Mostrar (Selecionada)
                 </div>
             </div>
         </div>
@@ -3782,8 +3784,8 @@
             if (isZoomIntent) {
                 e.preventDefault(); // Trava a movimentação para aplicar apenas o zoom
 
-                if (draggable && !isPanning) {
-                    // Escala Uniforme da Mídia
+                if (draggable && !isPanning && e.ctrlKey) {
+                    // Escala Uniforme da Mídia (exige CTRL)
                     const id = draggable.id.replace('admin-', '');
                     if (mediaState[id]) {
                         let sx = mediaState[id].scaleX !== undefined ? mediaState[id].scaleX : (mediaState[id].scale || 1);
