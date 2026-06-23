@@ -12,5 +12,33 @@
     "audioBehavior": "audio_before",
     "animation": "bounce",
     "pinned": false
+  },
+  {
+    "id": "tts-1782209001036r6tj5f4",
+    "name": "Jovi",
+    "imageUrl": "/uploads/jovirobo.png?v=1782122975133",
+    "audioUrl": "",
+    "subtitleColor": "#ffd700",
+    "position": "right",
+    "customFlip": false,
+    "customX": 80,
+    "customY": 80,
+    "audioBehavior": "audio_before",
+    "animation": "bounce",
+    "pinned": false
+  },
+  {
+    "id": "tts-17822090264450brnwjp",
+    "name": "Dava",
+    "imageUrl": "/uploads/firefox_Z18DyCU5Jd.png?v=1782123459416",
+    "audioUrl": "",
+    "subtitleColor": "#ffd700",
+    "position": "right",
+    "customFlip": false,
+    "customX": 80,
+    "customY": 80,
+    "audioBehavior": "audio_before",
+    "animation": "bounce",
+    "pinned": false
   }
 ]

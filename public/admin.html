@@ -1787,7 +1787,9 @@
             <div class="input-group">
                 <label style="display: flex; justify-content: space-between; align-items: center;">
                     <span>Modelo RVC</span>
-                    <div style="display: flex; gap: 6px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span id="rvc-engine-badge"
+                            style="display: none; font-size: 10px; font-weight: 700; background: linear-gradient(135deg, #f59e0b, #fbbf24); color: #000; padding: 2px 7px; border-radius: 10px; letter-spacing: 0.5px;">⚡ ONNX</span>
                         <button id="btn-open-rvc-history" title="Ver áudios gerados"
                             style="background: none; border: none; cursor: pointer; padding: 2px; margin: 0; font-size: 14px;">📁</button>
                         <button id="btn-refresh-rvc" title="Atualizar Modelos"
@@ -5492,22 +5494,78 @@
                     if (models.length === 0) {
                         const opt = document.createElement('option');
                         opt.value = '';
-                        opt.innerText = 'Nenhuma voz RVC encontrada (.pth)';
+                        opt.innerText = 'Nenhuma voz encontrada (.pth ou .onnx)';
                         rvcModelSelect.appendChild(opt);
                         return;
                     }
-                    models.forEach(m => {
-                        const opt = document.createElement('option');
-                        opt.value = m;
-                        opt.innerText = m.replace('.pth', '');
-                        rvcModelSelect.appendChild(opt);
-                    });
+
+                    const pthModels = models.filter(m => m.type === 'pth');
+                    const onnxModels = models.filter(m => m.type === 'onnx');
+
+                    if (pthModels.length > 0) {
+                        const group = document.createElement('optgroup');
+                        group.label = '🎙️ RVC Classic (PTH)';
+                        pthModels.forEach(m => {
+                            const opt = document.createElement('option');
+                            opt.value = m.name;
+                            opt.dataset.type = 'pth';
+                            opt.innerText = m.label;
+                            group.appendChild(opt);
+                        });
+                        rvcModelSelect.appendChild(group);
+                    }
+
+                    if (onnxModels.length > 0) {
+                        const group = document.createElement('optgroup');
+                        group.label = '⚡ RVC ONNX (Rápido)';
+                        onnxModels.forEach(m => {
+                            const opt = document.createElement('option');
+                            opt.value = m.name;
+                            opt.dataset.type = 'onnx';
+                            opt.innerText = m.label + ' ⚡';
+                            group.appendChild(opt);
+                        });
+                        rvcModelSelect.appendChild(group);
+                    }
+
+                    // Força atualização do badge/F0 para o item já selecionado
+                    updateRvcEngineUI();
                 })
                 .catch(err => {
                     console.error('Erro ao carregar vozes RVC', err);
                     rvcModelSelect.innerHTML = '<option value="">Erro ao carregar vozes</option>';
                 });
         }
+
+        function getSelectedModelType() {
+            const selected = rvcModelSelect.options[rvcModelSelect.selectedIndex];
+            return selected ? (selected.dataset.type || 'pth') : 'pth';
+        }
+
+        function updateRvcEngineUI() {
+            const type = getSelectedModelType();
+            const badge = document.getElementById('rvc-engine-badge');
+            const methodSelect = document.getElementById('rvc-method');
+
+            if (type === 'onnx') {
+                badge.style.display = 'inline-block';
+                // Desabilita métodos não suportados pelo ONNX
+                Array.from(methodSelect.options).forEach(opt => {
+                    const unsupported = ['rmvpe', 'crepe'];
+                    opt.disabled = unsupported.includes(opt.value);
+                    if (opt.disabled && opt.selected) {
+                        // Volta para PM automaticamente
+                        methodSelect.value = 'pm';
+                    }
+                });
+            } else {
+                badge.style.display = 'none';
+                // Reabilita todos os métodos para PTH
+                Array.from(methodSelect.options).forEach(opt => { opt.disabled = false; });
+            }
+        }
+
+        rvcModelSelect.addEventListener('change', updateRvcEngineUI);
 
         window.addEventListener('load', loadRvcModels);
 
@@ -5576,6 +5634,7 @@
         btnRvcPreview.addEventListener('click', async () => {
             const text = document.getElementById('tts-text').value.trim();
             const model = rvcModelSelect.value;
+            const modelType = getSelectedModelType();
             const pitch = parseInt(rvcPitch.value);
             const method = rvcMethod.value;
 
@@ -5593,7 +5652,7 @@
                 const res = await fetch('/api/tts/preview', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text, model, pitch, method })
+                    body: JSON.stringify({ text, model, modelType, pitch, method })
                 });
                 const data = await res.json();
 
@@ -5615,6 +5674,7 @@
         btnRvcLive.addEventListener('click', async () => {
             const text = document.getElementById('tts-text').value.trim();
             const model = rvcModelSelect.value;
+            const modelType = getSelectedModelType();
             const pitch = parseInt(rvcPitch.value);
             const method = rvcMethod.value;
 
@@ -5634,6 +5694,7 @@
                     body: JSON.stringify({
                         text,
                         model,
+                        modelType,
                         pitch,
                         method,
                         characterData: getCharacterData()
@@ -5980,6 +6041,7 @@
             // ============================================================
             function buildFormData() {
                 const model = rvcModelSelect.value;
+                const modelType = getSelectedModelType();
                 const pitch = parseInt(rvcPitch.value);
                 const method = rvcMethod.value;
 
@@ -5989,6 +6051,7 @@
                     const fd = new FormData();
                     fd.append('audio', recordedBlob, 'recording.webm');
                     fd.append('model', model);
+                    fd.append('modelType', modelType);
                     fd.append('pitch', pitch);
                     fd.append('method', method);
                     return fd;
@@ -5998,6 +6061,7 @@
                     const fd = new FormData();
                     fd.append('audio', uploadedFile, uploadedFile.name);
                     fd.append('model', model);
+                    fd.append('modelType', modelType);
                     fd.append('pitch', pitch);
                     fd.append('method', method);
                     return fd;
