@@ -3740,12 +3740,12 @@
             // Ignora atalho se estiver digitando num input
             if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
 
-            // Cola no meio da área de bastidores (à esquerda do OBS),
-            // bem longe da borda para que nenhum conteúdo apareça na live.
-            // canvasPadding=4000 → OBS começa em x=0 (canvas x=4000).
-            // Spawn em canvas x=2000 → OBS x=-2000 (2000px fora da tela).
-            const spawnX = canvasPadding / 2;
-            const spawnY = canvasPadding / 2;
+            // Cola na área de bastidores, 800px à esquerda do OBS e 100px para baixo.
+            // Isso evita que fique "longe demais" (como o 2000px anterior),
+            // mas dá uma margem boa para que a maioria das imagens/textos 
+            // não encoste na área do OBS.
+            const spawnX = canvasPadding - 800;
+            const spawnY = canvasPadding + 100;
 
             if (e.clipboardData.files && e.clipboardData.files.length > 0) {
                 handleFileUpload(e.clipboardData.files[0], spawnX, spawnY);
