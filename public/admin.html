@@ -6102,9 +6102,39 @@
             });
 
             btnRvcLiveVoice.addEventListener('click', async () => {
+                const charData = getCharacterData();
+
+                // Se já existe um áudio de preview gerado, usa ele diretamente sem reprocessar
+                if (rvcAudio.src && rvcAudio.src !== window.location.href) {
+                    // Extrai só o path relativo (remove origin e query string de cache)
+                    const url = new URL(rvcAudio.src);
+                    const rvcAudioUrl = url.pathname;
+                    setRvcButtons(true);
+                    try {
+                        const res = await fetch('/api/tts/emit-rvc', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ rvcAudioUrl, characterData: charData })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            if (activeTab === 'mic') setStatus('Enviado para a live! ✅', '#4ade80');
+                            setTimeout(() => { closeModal(); }, 1200);
+                        } else {
+                            alert('Erro ao enviar para live: ' + (data.error || 'Desconhecido'));
+                        }
+                    } catch (e) {
+                        alert('Erro na requisição RVC Live.');
+                        console.error(e);
+                    } finally {
+                        setRvcButtons(false);
+                    }
+                    return;
+                }
+
+                // Sem preview gerado ainda: processa o áudio agora
                 const fd = buildFormData();
                 if (!fd) return;
-                const charData = getCharacterData();
                 fd.append('characterDataJson', JSON.stringify(charData));
                 setRvcButtons(true);
                 rvcLoadingEl.style.display = 'block';
